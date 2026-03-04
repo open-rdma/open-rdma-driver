@@ -1,6 +1,3 @@
-use crate::constants::{
-    POST_RECV_TCP_LOOP_BACK_CLIENT_ADDRESS, POST_RECV_TCP_LOOP_BACK_SERVER_ADDRESS,
-};
 use crate::rdma_utils::types::ibv_qp_attr::{IbvQpAttr, IbvQpInitAttr};
 use crate::rdma_utils::types::{RecvWr, SendWr};
 use crate::RdmaCtxOps;
@@ -19,7 +16,7 @@ use super::{
     mock::MockDeviceCtx,
 };
 
-use crate::error::Result;
+use crate::error::{RdmaError, Result};
 
 macro_rules! deref_or_ret {
     ($ptr:expr, $ret:expr) => {
@@ -63,22 +60,20 @@ impl BlueRdmaCore {
 
     #[allow(clippy::unwrap_used, clippy::unwrap_in_result)]
     pub(super) fn new_emulated(sysfs_name: &str) -> Result<HwDeviceCtx<EmulatedHwDevice>> {
-        let device = match sysfs_name {
-            "uverbs0" => EmulatedHwDevice::new("127.0.0.1:7701".into(), "127.0.0.1:7003".into()),
-            "uverbs1" => EmulatedHwDevice::new("127.0.0.1:7702".into(), "127.0.0.1:7004".into()),
-            _ => unreachable!("unexpected sysfs_name"),
-        };
-        let (post_recv_ip, post_recv_peer_ip) = match sysfs_name {
-            "uverbs0" => (
-                POST_RECV_TCP_LOOP_BACK_CLIENT_ADDRESS,
-                POST_RECV_TCP_LOOP_BACK_SERVER_ADDRESS,
-            ),
-            "uverbs1" => (
-                POST_RECV_TCP_LOOP_BACK_SERVER_ADDRESS,
-                POST_RECV_TCP_LOOP_BACK_CLIENT_ADDRESS,
-            ),
-            _ => unreachable!("unexpected sysfs_name"),
-        };
+        log::info!("initializing emulated device with sysfs name: {sysfs_name}");
+        let rank_offset = sysfs_name
+            .chars()
+            .last()
+            .and_then(|c| c.to_digit(10))
+            .ok_or_else(|| {
+                RdmaError::InvalidInput(format!(
+                    "sysfs_name must end with a digit, got: {sysfs_name}"
+                ))
+            })? as u16;
+
+        let csr_addr = format!("127.0.0.1:{}", 7701u16 + rank_offset);
+        let post_recv_addr = format!("127.0.0.1:{}", 7003u16 + rank_offset);
+        let device = EmulatedHwDevice::new(csr_addr.into(), post_recv_addr.into());
 
         let ack = AckTimeoutConfig::new(16, 40, 2);
         let config = DeviceConfig { ack };

@@ -38,11 +38,7 @@ impl NetConfigReader {
 
         #[cfg(feature = "sim")]
         let interface = {
-            let interface_name = match sysfs_name.as_str() {
-                "uverbs0" => "blue0",
-                "uverbs1" => "blue1",
-                _ => panic!("unknown sysfs_name for sim: {}", sysfs_name),
-            };
+            let interface_name = Self::interface_name_from_sysfs(&sysfs_name);
             default_net::get_interfaces()
                 .into_iter()
                 .find(|x| x.name == interface_name)
@@ -72,6 +68,15 @@ impl NetConfigReader {
             gateway,
             mac,
         }
+    }
+
+    fn interface_name_from_sysfs(sysfs_name: &str) -> String {
+        let port_index = sysfs_name
+            .strip_prefix("uverbs")
+            .and_then(|suffix| suffix.parse::<usize>().ok())
+            .unwrap_or_else(|| panic!("unknown sysfs_name: {}", sysfs_name));
+
+        format!("blue{}", port_index)
     }
 
     pub(crate) fn read_mac_sysfs() -> io::Result<u64> {

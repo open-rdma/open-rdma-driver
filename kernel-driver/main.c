@@ -14,7 +14,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 #pragma region ib device
 
-#define N_TESTING 2
+#define N_TESTING 4
 static struct bluerdma_dev *testing_dev[N_TESTING] = {};
 
 static int bluerdma_new_testing(void)
