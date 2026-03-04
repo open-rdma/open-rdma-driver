@@ -42,7 +42,7 @@ init_test_environment() {
 
     # 设置 RTL_DIR，优先使用环境变量，否则使用默认值
     if [ -z "$RTL_DIR" ]; then
-        RTL_DIR="$DRIVER_DIR/../rtl"
+        RTL_DIR="$DRIVER_DIR/../open-rdma-rtl"
         if [ ! -d "$RTL_DIR" ]; then
             echo "Error: RTL directory not found: $RTL_DIR"
             exit 1

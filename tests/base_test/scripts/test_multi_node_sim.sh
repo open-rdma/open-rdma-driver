@@ -4,14 +4,13 @@
 
 # 检查参数
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 <test_program> [args...]"
-    echo "Example: $0 multi_node_send_recv 4096 4"
+    echo "Usage: $0 [args...]"
+    echo "Example: $0 4096 4"
     exit 1
 fi
 
 # 获取测试程序名称
-TEST_PROGRAM=$1
-shift  # 移除第一个参数，剩余参数将传递给测试程序
+TEST_PROGRAM="multi_node_send_recv"
 
 # 设置目录路径
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
