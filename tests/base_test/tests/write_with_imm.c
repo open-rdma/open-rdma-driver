@@ -8,9 +8,6 @@
 #define DEFAULT_PORT 12348
 #define MIN_BUFFER_SIZE 4096
 
-
-extern bool is_server;
-
 // RDMA WRITE with Immediate test
 // Server posts recv to receive immediate data
 // Client performs RDMA WRITE with immediate value
@@ -61,7 +58,8 @@ int run_server(int msg_len) {
            remote_info.qp_num, remote_info.rkey, remote_info.remote_addr);
 
     // Connect QP
-    if (rdma_connect_qp(ctx.qp, remote_info.qp_num) < 0) {
+    u_int32_t dest_gid_ipv4 = 0x1122330B; //client IP
+    if (rdma_connect_qp(ctx.qp, remote_info.qp_num, dest_gid_ipv4) < 0) {
         tcp_transport_close(&transport);
         rdma_destroy_context(&ctx);
         return -1;
@@ -203,7 +201,8 @@ int run_client(const char *server_ip, int msg_len) {
            remote_info.qp_num, remote_info.rkey, remote_info.remote_addr);
 
     // Connect QP
-    if (rdma_connect_qp(ctx.qp, remote_info.qp_num) < 0) {
+    uint32_t dest_gid_ipv4 = 0x1122330A; //server IP
+    if (rdma_connect_qp(ctx.qp, remote_info.qp_num, dest_gid_ipv4) < 0) {
         tcp_transport_close(&transport);
         rdma_destroy_context(&ctx);
         return -1;
@@ -316,11 +315,9 @@ int main(int argc, char *argv[]) {
 
     if (argc == 2) {
         // Server mode
-        is_server = true;
         return run_server(msg_len);
     } else {
         // Client mode
-        is_server = false;
         return run_client(argv[2], msg_len);
     }
 }

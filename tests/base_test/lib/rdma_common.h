@@ -56,11 +56,11 @@ void rdma_destroy_context(struct rdma_context *ctx);
 
 // QP state transitions
 int rdma_qp_to_init(struct ibv_qp *qp);
-int rdma_qp_to_rtr(struct ibv_qp *qp, uint32_t dest_qp_num);
+int rdma_qp_to_rtr(struct ibv_qp *qp, uint32_t dest_qp_num, uint32_t dest_gid_ipv4);
 int rdma_qp_to_rts(struct ibv_qp *qp);
 
 // Helper: Combined QP state transition to RTS
-int rdma_connect_qp(struct ibv_qp *qp, uint32_t dest_qp_num);
+int rdma_connect_qp(struct ibv_qp *qp, uint32_t dest_qp_num, uint32_t dest_gid_ipv4);
 
 // Buffer operations
 int rdma_alloc_buffer(char **buffer, size_t size, bool use_hugetlb);

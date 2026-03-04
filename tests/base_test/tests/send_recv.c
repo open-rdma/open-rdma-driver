@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 #define DEFAULT_PORT 12346
-extern bool is_server;
 
 int run_server(int msg_len) {
     struct rdma_context ctx;
@@ -50,7 +49,8 @@ int run_server(int msg_len) {
     }
 
     // Connect QP
-    if (rdma_connect_qp(ctx.qp, remote_info.qp_num) < 0) {
+    uint32_t dest_gid_ipv4 = 0x1122330B; //client IP
+    if (rdma_connect_qp(ctx.qp, remote_info.qp_num, dest_gid_ipv4) < 0) {
         tcp_transport_close(&transport);
         rdma_destroy_context(&ctx);
         return -1;
@@ -170,7 +170,8 @@ int run_client(int msg_len, const char *server_ip) {
            remote_info.qp_num, remote_info.rkey, remote_info.remote_addr);
 
     // Connect QP
-    if (rdma_connect_qp(ctx.qp, remote_info.qp_num) < 0) {
+    uint32_t dest_gid_ipv4 = 0x1122330A; //server IP
+    if (rdma_connect_qp(ctx.qp, remote_info.qp_num, dest_gid_ipv4) < 0) {
         tcp_transport_close(&transport);
         rdma_destroy_context(&ctx);
         return -1;
@@ -266,12 +267,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc == 2) {
-        // Server mode
-        is_server = true;
         return run_server(msg_len);
     } else {
-        // Client mode
-        is_server = false;
         return run_client(msg_len, argv[2]);
     }
 }

@@ -8,9 +8,6 @@
 
 bool rdma_debug_enabled = true;
 
-// TODO 需要删除，替换为更为模块化的东西
-bool is_server = false;
-
 void rdma_set_debug(bool enabled) {
     rdma_debug_enabled = enabled;
 }
@@ -227,7 +224,7 @@ int rdma_qp_to_init(struct ibv_qp *qp) {
     return 0;
 }
 
-int rdma_qp_to_rtr(struct ibv_qp *qp, uint32_t dest_qp_num) {
+int rdma_qp_to_rtr(struct ibv_qp *qp, uint32_t dest_qp_num, uint32_t dest_gid_ipv4) {
     rdma_log("[RDMA] Transitioning QP to RTR state (dest_qp_num=%u)\n", dest_qp_num);
 
     struct ibv_qp_attr attr = {
@@ -245,17 +242,15 @@ int rdma_qp_to_rtr(struct ibv_qp *qp, uint32_t dest_qp_num) {
             .port_num = 1
         }
     };
-    // Set GID for loopback
-    // uint32_t ipv4_addr = 0x1122330A;  // Default IPv4 for testing
-    uint32_t ipv4_addr = is_server ? 0x1122330B : 0x1122330A;
-    rdma_log("[RDMA] Setting GID with IPv4 address 0x%08x (is_server=%d)\n",
-             ipv4_addr, is_server);
+
+    rdma_log("[RDMA] Setting dest GID with IPv4 address 0x%08x\n",
+             dest_gid_ipv4);
     attr.ah_attr.grh.dgid.raw[10] = 0xFF;
     attr.ah_attr.grh.dgid.raw[11] = 0xFF;
-    attr.ah_attr.grh.dgid.raw[12] = (ipv4_addr >> 24) & 0xFF;
-    attr.ah_attr.grh.dgid.raw[13] = (ipv4_addr >> 16) & 0xFF;
-    attr.ah_attr.grh.dgid.raw[14] = (ipv4_addr >> 8) & 0xFF;
-    attr.ah_attr.grh.dgid.raw[15] = ipv4_addr & 0xFF;
+    attr.ah_attr.grh.dgid.raw[12] = (dest_gid_ipv4 >> 24) & 0xFF;
+    attr.ah_attr.grh.dgid.raw[13] = (dest_gid_ipv4 >> 16) & 0xFF;
+    attr.ah_attr.grh.dgid.raw[14] = (dest_gid_ipv4 >> 8) & 0xFF;
+    attr.ah_attr.grh.dgid.raw[15] = dest_gid_ipv4 & 0xFF;
 
     if (ibv_modify_qp(qp, &attr,
                       IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN |
@@ -291,9 +286,9 @@ int rdma_qp_to_rts(struct ibv_qp *qp) {
     return 0;
 }
 
-int rdma_connect_qp(struct ibv_qp *qp, uint32_t dest_qp_num) {
+int rdma_connect_qp(struct ibv_qp *qp, uint32_t dest_qp_num, uint32_t dest_gid_ipv4) {
     if (rdma_qp_to_init(qp) < 0) return -1;
-    if (rdma_qp_to_rtr(qp, dest_qp_num) < 0) return -1;
+    if (rdma_qp_to_rtr(qp, dest_qp_num, dest_gid_ipv4) < 0) return -1;
     if (rdma_qp_to_rts(qp) < 0) return -1;
 
     rdma_log("[RDMA] QP connected successfully\n");

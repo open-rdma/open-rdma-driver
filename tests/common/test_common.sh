@@ -42,7 +42,7 @@ init_test_environment() {
 
     # 设置 RTL_DIR，优先使用环境变量，否则使用默认值
     if [ -z "$RTL_DIR" ]; then
-        RTL_DIR="$DRIVER_DIR/../open-rdma-rtl"
+        RTL_DIR="$DRIVER_DIR/../rtl"
         if [ ! -d "$RTL_DIR" ]; then
             echo "Error: RTL directory not found: $RTL_DIR"
             exit 1
@@ -79,6 +79,77 @@ build_rust_driver() {
     fi
 
     echo "Rust driver built successfully"
+}
+
+start_soft_switch() {
+    echo "Starting soft switch simulator..."
+    if [ -z "$RTL_DIR" ]; then
+        echo "Error: RTL_DIR not set. Call init_test_environment first."
+        exit 1
+    fi
+
+    SOFT_SWITCH="$RTL_DIR/test/soft_sw/sw.py"
+    if [ ! -f "$SOFT_SWITCH" ]; then
+        echo "Error: Soft switch simulator not found: $SOFT_SWITCH"
+        exit 1
+    fi
+    python3 "$SOFT_SWITCH" > "$LOG_DIR/soft_switch.log" 2>&1 &
+
+    SOFT_SWITCH_PID=$!
+
+    export SOFT_SWITCH_PID
+}
+
+start_rtl_simulators_with_switch() {
+    local num_instances=$1
+    local test_name=${2:-"test"}
+
+    if [ -z "$RTL_DIR" ]; then
+        echo "Error: RTL_DIR not set. Call init_test_environment first."
+        exit 1
+    fi
+
+    if [ -z "$LOG_DIR" ]; then
+        echo "Error: LOG_DIR not set."
+        exit 1
+    fi
+
+    echo "Starting RTL simulator(s)..."
+
+    local rtl_cocotb_dir="$RTL_DIR/test/cocotb"
+    cd "$rtl_cocotb_dir"
+
+    echo "Current directory: $(pwd)"
+
+    # verilator 编译
+    make compile_verilator
+
+    # 清空 RTL_PIDS 数组
+    RTL_PIDS=()
+
+    for i in $(seq 1 $num_instances); do
+        make INST_ID=$i run_system_test_multi_node > "$LOG_DIR/rtl-$test_name-$i.log" 2>&1 &
+        RTL_PIDS+=($!)
+        echo "RTL instance $i PID: ${RTL_PIDS[$((i-1))]}"
+    done
+
+    # 等待 RTL 启动
+    echo "Waiting for RTL to start..."
+    sleep 2
+
+    # 验证 RTL 进程是否成功启动
+    echo "Verifying RTL simulators..."
+    for pid in "${RTL_PIDS[@]}"; do
+        if ! kill -0 $pid 2>/dev/null; then
+            echo "Error: RTL process $pid failed to start or died"
+            cleanup_rtl_simulators
+            exit 1
+        fi
+    done
+    echo "All RTL simulators verified running"
+
+    # 导出 PID 数组
+    export RTL_PIDS
 }
 
 # 启动 RTL 模拟器
@@ -283,6 +354,18 @@ cleanup_rtl_simulators() {
     if [ -n "$bsv_pids" ]; then
         echo "Cleaning up mkBsvTopW processes: $bsv_pids"
         kill -9 $bsv_pids 2>/dev/null || true
+    fi
+    
+    # 清理软交换机进程
+    if [ -n "$SOFT_SWITCH_PID" ]; then
+        if kill -0 $SOFT_SWITCH_PID 2>/dev/null; then
+            echo "Terminating soft switch simulator (PID: $SOFT_SWITCH_PID)"
+            kill -TERM $SOFT_SWITCH_PID 2>/dev/null
+            sleep 1
+            if kill -0 $SOFT_SWITCH_PID 2>/dev/null; then
+                kill -9 $SOFT_SWITCH_PID 2>/dev/null
+            fi
+        fi
     fi
 
     echo "RTL simulators cleanup completed"

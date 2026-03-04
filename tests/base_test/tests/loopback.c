@@ -5,9 +5,6 @@
 #include <unistd.h>
 
 
-//TDO 删除这个
-extern bool is_server;
-
 // Loopback test: Two QPs on the same device communicate with each other
 int run_loopback_test(int msg_len, int num_rounds) {
     struct rdma_context ctx;
@@ -16,7 +13,6 @@ int run_loopback_test(int msg_len, int num_rounds) {
     char *src_buffer, *dst_buffer;
     int failed_rounds = 0;
 
-    is_server = false;
     // Configure RDMA context
     rdma_default_config(&config);
     config.dev_index = 0;
@@ -62,14 +58,15 @@ int run_loopback_test(int msg_len, int num_rounds) {
 
     // Connect QPs to each other
     printf("[LOOPBACK] Connecting QP0 -> QP1\n");
-    if (rdma_connect_qp(qp0, qp1->qp_num) < 0) {
+    uint32_t dest_gid_ipv4 = 0x1122330A;
+    if (rdma_connect_qp(qp0, qp1->qp_num, dest_gid_ipv4) < 0) {
         ibv_destroy_qp(qp1);
         rdma_destroy_context(&ctx);
         return -1;
     }
 
     printf("[LOOPBACK] Connecting QP1 -> QP0\n");
-    if (rdma_connect_qp(qp1, qp0->qp_num) < 0) {
+    if (rdma_connect_qp(qp1, qp0->qp_num, dest_gid_ipv4) < 0) {
         ibv_destroy_qp(qp1);
         rdma_destroy_context(&ctx);
         return -1;
