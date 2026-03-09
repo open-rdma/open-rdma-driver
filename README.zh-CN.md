@@ -19,6 +19,11 @@ Open RDMA 由两个相互配合的仓库构成：
 
 两者通过软硬件协同共同实现 RoCEv2（RDMA over Converged Ethernet v2）协议栈的核心子集，RDMA 语义由软件与硬件共同承载。
 
+## 安装
+
+- [驱动安装指南](docs/zh-CN/installation.md)：环境要求、编译步骤及常见问题排查
+- [RTL 仿真指南](docs/zh-CN/rtl-simulation.md)：RTL 仿真环境搭建与驱动联调（Sim 模式）
+
 ## 系统架构
 
 ```
@@ -62,7 +67,3 @@ Rust 驱动                        (rust-driver / libbluerdma_rust.so)
 | [驱动安装指南](docs/zh-CN/installation.md) | 完整的安装、配置与常见问题排查 |
 | [RTL 仿真指南](docs/zh-CN/rtl-simulation.md) | RTL 仿真环境搭建与驱动联调（Sim 模式）|
 | [Rust 驱动架构](docs/zh-CN/introduction.md) | 内部架构、模块说明与设计决策 |
-
-## 许可证
-
-本项目遵循 [GNU 通用公共许可证 v2.0](LISENCE)。

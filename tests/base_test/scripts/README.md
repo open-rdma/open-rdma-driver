@@ -1,42 +1,42 @@
 # Base Test Scripts
 
-用于运行 RDMA 基础测试的自动化脚本，主要用于 RTL 模拟器环境（Sim 模式）。
+Automated scripts for running RDMA base tests, primarily for the RTL simulator environment (Sim mode).
 
-## 环境准备
+## Environment Setup
 
-### RTL 仿真器路径配置
+### RTL Simulator Path Configuration
 
-测试脚本需要访问 RTL 仿真器代码（`open-rdma-rtl` 仓库）。
+The test scripts need access to the RTL simulator code (`open-rdma-rtl` repository).
 
-**配置方式 1：默认路径（推荐）**
+**Method 1: Default path (recommended)**
 
-将 `open-rdma-rtl` 克隆到与 `open-rdma-driver` 同级目录：
+Clone `open-rdma-rtl` into the same parent directory as `open-rdma-driver`:
 
 ```bash
 cd /path/to/parent-directory
 git clone https://github.com/open-rdma/open-rdma-rtl.git
 ```
 
-目录结构：
+Directory structure:
 ```
 parent-directory/
 ├── open-rdma-driver/
 └── open-rdma-rtl/
 ```
 
-**配置方式 2：自定义路径**
+**Method 2: Custom path**
 
-设置 `RTL_DIR` 环境变量：
+Set the `RTL_DIR` environment variable:
 
 ```bash
 export RTL_DIR=/path/to/your/open-rdma-rtl
-# 或在运行时指定
+# Or specify it at runtime
 RTL_DIR=/custom/path ./test_loopback_sim.sh
 ```
 
-## 快速使用
+## Quick Usage
 
-### 运行单个测试
+### Run Individual Tests
 
 ```bash
 ./test_loopback_sim.sh [msg_len]
@@ -45,21 +45,21 @@ RTL_DIR=/custom/path ./test_loopback_sim.sh
 ./test_write_imm_sim.sh [msg_len]
 ```
 
-**示例**：
+**Examples**:
 ```bash
-./test_loopback_sim.sh 4096              # Loopback，4KB 消息
-./test_send_recv_sim.sh 8192             # Send/Recv，8KB 消息
-./test_rdma_write_sim.sh 4096 10         # RDMA Write，4KB，10 轮
-./test_write_imm_sim.sh 0                # Write with Imm，零长度
+./test_loopback_sim.sh 4096              # Loopback, 4KB message
+./test_send_recv_sim.sh 8192             # Send/Recv, 8KB message
+./test_rdma_write_sim.sh 4096 10         # RDMA Write, 4KB, 10 rounds
+./test_write_imm_sim.sh 0                # Write with Imm, zero-length
 ```
 
-### 运行所有测试
+### Run All Tests
 
 ```bash
 ./run_all_tests.sh
 ```
 
-输出示例：
+Example output:
 ```
 ==========================================
           Test Suite Summary
@@ -75,123 +75,123 @@ Failed: 0
 ==========================================
 ```
 
-## 脚本详细说明
+## Script Descriptions
 
 ### test_loopback_sim.sh
-单端回环测试，一个设备上两个 QP 互相通信。
+Single-node loopback test — two QPs on one device communicate with each other.
 
-**参数**：
-- `msg_len`：消息长度（字节），默认 4096
+**Parameters**:
+- `msg_len`: message length in bytes (default: 4096)
 
 ### test_send_recv_sim.sh
-双端 Send/Recv 测试。
+Two-node Send/Recv test.
 
-**参数**：
-- `msg_len`：消息长度（字节），默认 4096
+**Parameters**:
+- `msg_len`: message length in bytes (default: 4096)
 
 ### test_rdma_write_sim.sh
-双端 RDMA WRITE 多轮测试。
+Two-node RDMA WRITE multi-round test.
 
-**参数**：
-- `msg_len`：消息长度（字节），默认 4096
-- `rounds`：测试轮数，默认 5
+**Parameters**:
+- `msg_len`: message length in bytes (default: 4096)
+- `rounds`: number of test rounds (default: 5)
 
 ### test_write_imm_sim.sh
-双端 RDMA WRITE with Immediate 测试。
+Two-node RDMA WRITE with Immediate test.
 
-**参数**：
-- `msg_len`：消息长度（字节），默认 4096
-  - 可以设置为 0 进行零长度测试（只传输 immediate 值）
+**Parameters**:
+- `msg_len`: message length in bytes (default: 4096)
+  - Can be set to 0 for a zero-length test (transfers only the immediate value)
 
 ### run_dual_sim_test.sh
-通用的双端测试框架，其他脚本基于此实现。
+General two-node test framework used as the basis for the other scripts.
 
-**用法**：
+**Usage**:
 ```bash
 ./run_dual_sim_test.sh <test_program> [args...]
 ```
 
-## 测试日志
+## Test Logs
 
-日志保存在 `../log/sim/` 目录：
+Logs are saved in the `../log/sim/` directory:
 
 ```
 log/sim/
-├── rtl-loopback.log           # Loopback RTL 日志
+├── rtl-loopback.log           # Loopback RTL log
 ├── send_recv/
-│   ├── server.log             # Server 应用日志
-│   ├── client.log             # Client 应用日志
-│   ├── rtl-server.log         # Server RTL 日志
-│   └── rtl-client.log         # Client RTL 日志
+│   ├── server.log             # Server application log
+│   ├── client.log             # Client application log
+│   ├── rtl-server.log         # Server RTL log
+│   └── rtl-client.log         # Client RTL log
 └── rdma_write/
     └── ...
 ```
 
-**查看日志**：
+**Viewing logs**:
 ```bash
-cat ../log/sim/rtl-loopback.log               # 查看日志
-tail -f ../log/sim/send_recv/server.log       # 实时查看
+cat ../log/sim/rtl-loopback.log               # View log
+tail -f ../log/sim/send_recv/server.log       # Live view
 ```
 
-## 脚本功能
+## What the Scripts Do
 
-所有测试脚本会自动执行以下操作：
+All test scripts automatically perform the following steps:
 
-1. **初始化环境**：设置 DRIVER_DIR、RTL_DIR 路径
-2. **编译 Rust 驱动**：使用 sim 特性编译 dtld-ibverbs
-3. **启动 RTL 仿真器**：自动启动所需数量的 RTL 实例
-4. **编译测试程序**：编译 base_test 测试程序
-5. **运行测试**：启动 server/client 进程（双端测试）
-6. **收集日志**：所有输出保存到日志文件
-7. **清理资源**：测试结束后自动停止 RTL 仿真器
+1. **Initialize environment**: Set DRIVER_DIR and RTL_DIR paths
+2. **Build Rust driver**: Compile dtld-ibverbs with the sim feature
+3. **Start RTL simulator**: Automatically start the required number of RTL instances
+4. **Build test programs**: Compile the base_test test programs
+5. **Run tests**: Start server/client processes (for two-node tests)
+6. **Collect logs**: Save all output to log files
+7. **Clean up**: Automatically stop the RTL simulator after the test
 
-## 环境变量
+## Environment Variables
 
 ### RTL_DIR
-RTL 仓库路径（可选，默认为 `../../../open-rdma-rtl`）
+RTL repository path (optional; defaults to `../../../open-rdma-rtl`)
 
 ```bash
 export RTL_DIR=/path/to/open-rdma-rtl
 ```
 
 ### RUST_LOG
-Rust 驱动日志级别（默认 `info`）
+Rust driver log level (default: `info`)
 
 ```bash
 RUST_LOG=debug ./test_loopback_sim.sh
 ```
 
-可选值：`trace`, `debug`, `info`, `warn`, `error`
+Available levels: `trace`, `debug`, `info`, `warn`, `error`
 
-## 故障排查
+## Troubleshooting
 
-### RTL 目录未找到
+### RTL directory not found
 ```
 Error: RTL directory not found: /path/to/open-rdma-rtl
 ```
-**解决**：
-- 确认 RTL 仓库已克隆
-- 检查目录结构或设置 `RTL_DIR` 环境变量
+**Solution**:
+- Confirm the RTL repository has been cloned
+- Check the directory structure or set the `RTL_DIR` environment variable
 
-### RTL 启动失败
+### RTL fails to start
 ```
 Error: RTL process failed to start or died
 ```
-**解决**：
-- 查看 RTL 日志：`cat ../log/sim/rtl-*.log`
-- 确保 RTL 仓库完整（包含子模块）
+**Solution**:
+- View RTL logs: `cat ../log/sim/rtl-*.log`
+- Ensure the RTL repository is complete (including submodules)
 
-### 测试超时
-**解决**：
-- 检查应用日志：`tail ../log/sim/<test>/server.log`
-- 检查 RTL 日志是否有错误
+### Test timeout
+**Solution**:
+- Check application logs: `tail ../log/sim/<test>/server.log`
+- Check RTL logs for errors
 
-### 数据验证失败
-测试会自动显示字节级差异，检查：
-- 日志中的详细差异信息
-- RTL 仿真器是否正常工作
+### Data validation failure
+The test will automatically display byte-level differences. Check:
+- Detailed diff information in the logs
+- Whether the RTL simulator is working correctly
 
-## 参考
+## References
 
-- [../README.md](../README.md) - 测试框架总览
-- [../../common/test_common.sh](../../common/test_common.sh) - 公共测试函数库
+- [../README.md](../README.md) - Test framework overview
+- [../../common/test_common.sh](../../common/test_common.sh) - Common test function library

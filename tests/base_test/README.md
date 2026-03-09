@@ -1,114 +1,114 @@
-# Base Test - RDMA 测试框架
+# Base Test — RDMA Test Framework
 
-重构后的 RDMA 测试框架，将功能库和测试用例分离，提供简洁、可维护的测试代码。
+A refactored RDMA test framework that separates the library from test cases, providing clean and maintainable test code.
 
-## 目录结构
+## Directory Structure
 
 ```
 base_test/
-├── lib/          → 公共功能库
-│   ├── rdma_common.*      - RDMA 基础操作 (设备、QP、Buffer)
-│   ├── rdma_transport.*   - 传输层抽象 (TCP 连接、信息交换)
-│   └── rdma_debug.*       - 调试工具 (内存对比、打印)
-├── tests/        → 测试用例
-│   ├── loopback.c         - Loopback 测试
-│   ├── send_recv.c        - Send/Recv 测试
+├── lib/          → Shared library
+│   ├── rdma_common.*      - RDMA basic operations (device, QP, buffer)
+│   ├── rdma_transport.*   - Transport abstraction (TCP connection, info exchange)
+│   └── rdma_debug.*       - Debug utilities (memory diff, printing)
+├── tests/        → Test cases
+│   ├── loopback.c         - Loopback test
+│   ├── send_recv.c        - Send/Recv test
 │   ├── write_with_imm.c   - RDMA WRITE with Immediate
-│   └── rdma_write.c       - RDMA WRITE 多轮测试
-├── scripts/      → 自动化测试脚本（Sim 模式）
-└── build/        → 构建产物
-    ├── obj/      - 库对象文件
-    └── bin/      - 可执行文件
+│   └── rdma_write.c       - RDMA WRITE multi-round test
+├── scripts/      → Automated test scripts (Sim mode)
+└── build/        → Build artifacts
+    ├── obj/      - Library object files
+    └── bin/      - Executables
 ```
 
-## 快速开始
+## Quick Start
 
-### 1. 编译测试
+### 1. Build Tests
 
 ```bash
-make              # 编译所有测试
-make clean        # 清理构建产物
-make list         # 列出可用测试
+make              # Build all tests
+make clean        # Clean build artifacts
+make list         # List available tests
 ```
 
-### 2. 运行测试
+### 2. Run Tests
 
-#### Mock 模式（不需要 RTL 仿真器）
+#### Mock mode (no RTL simulator required)
 
-直接运行编译好的测试程序：
+Run the compiled test programs directly:
 
 ```bash
-# Loopback 测试
+# Loopback test
 ./build/bin/loopback 4096
 
-# Send/Recv 测试（需要两个终端）
-./build/bin/send_recv 4096              # 终端 1: Server
-./build/bin/send_recv 4096 127.0.0.1    # 终端 2: Client
+# Send/Recv test (requires two terminals)
+./build/bin/send_recv 4096              # Terminal 1: Server
+./build/bin/send_recv 4096 127.0.0.1    # Terminal 2: Client
 
-# RDMA WRITE 测试
-./build/bin/rdma_write 8192 server 1 5              # 终端 1: Server
-./build/bin/rdma_write 8192 client 127.0.0.1 0 5    # 终端 2: Client
+# RDMA WRITE test
+./build/bin/rdma_write 8192 server 1 5              # Terminal 1: Server
+./build/bin/rdma_write 8192 client 127.0.0.1 0 5    # Terminal 2: Client
 
 # WRITE with Immediate
-./build/bin/write_with_imm 4096              # 终端 1: Server
-./build/bin/write_with_imm 4096 127.0.0.1    # 终端 2: Client
+./build/bin/write_with_imm 4096              # Terminal 1: Server
+./build/bin/write_with_imm 4096 127.0.0.1    # Terminal 2: Client
 ```
 
-#### Sim 模式（需要 RTL 仿真器）
+#### Sim mode (requires RTL simulator)
 
-使用自动化脚本，会自动启动 RTL 仿真器、编译驱动和测试程序。
+Use the automated scripts, which automatically start the RTL simulator, build the driver and test programs.
 
-**环境准备：配置 RTL 路径**
+**Environment setup: configure the RTL path**
 
-将 `open-rdma-rtl` 仓库克隆到与 `open-rdma-driver` 同级目录：
+Clone the `open-rdma-rtl` repository into the same parent directory as `open-rdma-driver`:
 
 ```bash
-# 在父目录下运行
+# Run from the parent directory
 cd /path/to/parent-directory
 git clone https://github.com/open-rdma/open-rdma-rtl.git
 ```
 
-目录结构：
+Directory structure:
 ```
 parent-directory/
 ├── open-rdma-driver/
-│   └── tests/base_test/  ← 当前目录
-└── open-rdma-rtl/        ← RTL 仓库
+│   └── tests/base_test/  ← current directory
+└── open-rdma-rtl/        ← RTL repository
 ```
 
-或设置环境变量指定自定义路径：
+Or set an environment variable to specify a custom path:
 ```bash
 export RTL_DIR=/path/to/your/open-rdma-rtl
 ```
 
-**运行测试：**
+**Running tests:**
 
 ```bash
 cd scripts/
 
-# 运行单个测试
+# Run individual tests
 ./test_loopback_sim.sh 4096
 ./test_send_recv_sim.sh 4096
 ./test_rdma_write_sim.sh 4096 5
 ./test_write_imm_sim.sh 4096
 
-# 运行所有测试
+# Run all tests
 ./run_all_tests.sh
 ```
 
-测试日志保存在 `log/sim/` 目录：
+Test logs are saved in the `log/sim/` directory:
 ```bash
-cat log/sim/rtl-loopback.log                # Loopback 日志
-cat log/sim/send_recv/server.log            # Send/Recv Server 日志
-tail -f log/sim/rdma_write/client.log       # 实时查看 Client 日志
+cat log/sim/rtl-loopback.log                # Loopback log
+cat log/sim/send_recv/server.log            # Send/Recv server log
+tail -f log/sim/rdma_write/client.log       # Live view of client log
 ```
 
-## 库 API 文档
+## Library API Documentation
 
-### rdma_common - RDMA 基础操作
+### rdma_common — RDMA Basic Operations
 
 ```c
-// 初始化
+// Initialization
 struct rdma_context ctx;
 struct rdma_config config;
 rdma_default_config(&config);
@@ -116,41 +116,41 @@ config.dev_index = 0;
 config.buffer_size = 4096;
 rdma_init_context(&ctx, &config);
 
-// QP 状态转换
-rdma_connect_qp(qp, dest_qp_num);  // 一步到位
+// QP state transition
+rdma_connect_qp(qp, dest_qp_num);  // Single-step transition
 
-// 清理
+// Cleanup
 rdma_destroy_context(&ctx);
 ```
 
-### rdma_transport - 传输层抽象
+### rdma_transport — Transport Abstraction
 
 ```c
-// Server 端
+// Server side
 struct tcp_transport transport;
 tcp_server_init(&transport, port);
 tcp_server_accept(&transport);
 rdma_exchange_qp_info(transport.client_fd, &local_info, &remote_info);
 
-// Client 端
+// Client side
 tcp_client_connect(&transport, server_ip, port, max_retries);
 rdma_exchange_qp_info(transport.sock_fd, &local_info, &remote_info);
 
-// 清理
+// Cleanup
 tcp_transport_close(&transport);
 ```
 
-### rdma_debug - 调试工具
+### rdma_debug — Debug Utilities
 
 ```c
-rdma_memory_diff(expected, actual, length);    // 内存对比
-rdma_print_memory_hex(buffer, length);         // 打印内存
-COMPILER_BARRIER();                            // 编译器屏障
+rdma_memory_diff(expected, actual, length);    // Memory diff
+rdma_print_memory_hex(buffer, length);         // Print memory as hex
+COMPILER_BARRIER();                            // Compiler barrier
 ```
 
-## 添加新测试
+## Adding New Tests
 
-在 `tests/` 目录创建新文件：
+Create a new file in the `tests/` directory:
 
 ```c
 #include "../lib/rdma_common.h"
@@ -164,36 +164,36 @@ int main(int argc, char *argv[]) {
     config.buffer_size = 4096;
 
     rdma_init_context(&ctx, &config);
-    // 测试逻辑...
+    // Test logic...
     rdma_destroy_context(&ctx);
     return 0;
 }
 ```
 
-然后运行 `make` 会自动编译新测试。
+Running `make` will automatically compile the new test.
 
-## 故障排除
+## Troubleshooting
 
-### RTL 目录未找到
+### RTL directory not found
 ```
 Error: RTL directory not found
 ```
-**解决**：确认 `open-rdma-rtl` 与 `open-rdma-driver` 在同级目录，或设置 `RTL_DIR` 环境变量
+**Solution**: Confirm that `open-rdma-rtl` is in the same parent directory as `open-rdma-driver`, or set the `RTL_DIR` environment variable.
 
-### 找不到设备
+### Device not found
 ```
 [ERROR] Device index 0 not available
 ```
-**解决**：确保 `LD_LIBRARY_PATH` 包含 libibverbs 和驱动库路径
+**Solution**: Ensure `LD_LIBRARY_PATH` includes the paths to libibverbs and the driver library.
 
-### 编译错误
+### Build error
 ```
 fatal error: rdma_common.h: No such file or directory
 ```
-**解决**：使用 `#include "../lib/rdma_common.h"` 而不是 `#include "rdma_common.h"`
+**Solution**: Use `#include "../lib/rdma_common.h"` instead of `#include "rdma_common.h"`.
 
-## 参考
+## References
 
-- [scripts/README.md](scripts/README.md) - 测试脚本使用指南
-- [lib/rdma_common.h](lib/rdma_common.h) - API 定义
-- [tests/loopback.c](tests/loopback.c) - 示例测试代码
+- [scripts/README.md](scripts/README.md) - Test script usage guide
+- [lib/rdma_common.h](lib/rdma_common.h) - API definitions
+- [tests/loopback.c](tests/loopback.c) - Example test code
