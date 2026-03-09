@@ -67,3 +67,12 @@ Rust 驱动                        (rust-driver / libbluerdma_rust.so)
 | [驱动安装指南](docs/zh-CN/installation.md) | 完整的安装、配置与常见问题排查 |
 | [RTL 仿真指南](docs/zh-CN/rtl-simulation.md) | RTL 仿真环境搭建与驱动联调（Sim 模式）|
 | [Rust 驱动架构](docs/zh-CN/introduction.md) | 内部架构、模块说明与设计决策 |
+
+## 参与贡献
+
+欢迎任何形式的贡献！如果您有问题、建议或想参与开发，欢迎添加**达坦小助手**微信，加入我们的开发者社区：
+
+<div align="center">
+  <img src="docs/images/wechat-qr.png" alt="达坦小助手微信二维码" width="200"/>
+  <p>扫码添加达坦小助手</p>
+</div>
