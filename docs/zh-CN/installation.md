@@ -448,7 +448,7 @@ cd .. && git clone https://github.com/open-rdma/open-rdma-rtl.git
 - [OFED 符号版本修复](./detail/ofed-symbol-version-fix.md)
 - [OFED RoCE 注册问题](./detail/ofed-roce-registration-issue.md)
 - [切换到 vanilla RDMA](./detail/switch-to-vanilla-rdma.md)
-- [自动化测试框架说明](../tests/base_test/README.md)
-- [测试脚本使用指南](../tests/base_test/scripts/README.md)
+- [自动化测试框架说明](../../tests/base_test/README.md)
+- [测试脚本使用指南](../../tests/base_test/scripts/README.md)
 
 
