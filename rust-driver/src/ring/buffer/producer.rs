@@ -130,7 +130,7 @@ where
     /// have performance implications. Consider using batch operations.
     pub(crate) fn available(&mut self) -> io::Result<u32> {
         // Read hardware tail pointer (modular, in [0, BUF_SIZE))
-        let hw_tail = self.csr_ring.read_tail()?;
+        let hw_tail = self.cached_hw_tail;
 
         let hw_tail_mod = hw_tail & Self::BUF_SIZE_MASK;
 
@@ -183,7 +183,10 @@ where
         }
 
         if self.available()? < count {
-            return Ok(0);
+            self.sync_tail()?;
+            if self.available()? < count {
+                return Ok(0);
+            }
         }
 
         let start_head = self.cached_head;
@@ -245,10 +248,14 @@ where
     // }
 
     pub(crate) fn try_push_atomic(&mut self, elements: &[Spec::Element]) -> io::Result<bool> {
+        let avai = self.available()?;
+        log::debug!("[available] try_push_atomic: available={}", avai);
         if (self.available()? as usize) < elements.len() {
-            return Ok(false);
+            self.sync_tail()?;
+            if (self.available()? as usize) < elements.len() {
+                return Ok(false);
+            }
         }
-
         let index = self.cached_head & Self::BUF_SIZE_MASK;
 
         elements.into_iter().enumerate().for_each(|(i, element)| {
@@ -278,6 +285,7 @@ where
 
     /// Manually synchronize tail from hardware
     pub(crate) fn sync_tail(&mut self) -> io::Result<()> {
+        log::trace!("sync_tail");
         let hw_tail = self.csr_ring.read_tail()?;
         self.cached_hw_tail = hw_tail;
         Ok(())
