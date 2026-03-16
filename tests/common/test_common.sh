@@ -238,7 +238,7 @@ setup_runtime_environment() {
 
 
     # 编译 rdma-core
-    $(cd $DTLD_DIR/rdma-core-55.0/build && ./build.sh)
+    (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
 
 
     # 设置 LD_LIBRARY_PATH
