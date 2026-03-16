@@ -1,14 +1,14 @@
+use super::desc_ring::DmaBuffer;
 use crate::ring::csr::ring_csr::ReaderOps;
 use crate::ring::{
     csr::RingCsr,
     traits::{DeviceAdaptor, FromRingBytes, RingSpecToHost},
 };
+use std::fmt::Debug;
 use std::{
     io,
     sync::atomic::{fence, Ordering},
 };
-
-use super::desc_ring::DmaBuffer;
 
 // ============================================================================
 // Consumer Ring (Card → Host)
@@ -56,6 +56,7 @@ where
     Dev: DeviceAdaptor,
     Spec: RingSpecToHost,
     Spec::Element: FromRingBytes,
+    <Spec::Element as FromRingBytes>::Bytes: Debug,
 {
     const BUF_SIZE: u32 = 1 << BUF_SIZE_EXP;
     const BUF_SIZE_MASK: u32 = Self::BUF_SIZE - 1;
@@ -105,22 +106,8 @@ where
         let hw_head = self.csr_ring.read_head()?;
         self.cached_hw_head = hw_head;
 
-        let hw_head_mod = hw_head & Self::BUF_SIZE_MASK;
-
-        let tail_mod = self.cached_tail & Self::BUF_SIZE_MASK;
-        let tail_with_guard = self.cached_tail & Self::HW_PTR_MASK;
-
-        if hw_head_mod == tail_mod {
-            if tail_with_guard == hw_head {
-                return Ok(0);
-            } else {
-                return Ok(Self::BUF_SIZE as usize);
-            }
-        }
-
         // Modular distance: works correctly across wraparound
-        let available =
-            hw_head.wrapping_sub(tail_mod).wrapping_add(Self::BUF_SIZE) & Self::BUF_SIZE_MASK;
+        let available = hw_head.wrapping_sub(self.cached_tail) & Self::HW_PTR_MASK;
 
         Ok(available as usize)
     }
@@ -129,7 +116,7 @@ where
         let index = self.tail() & Self::BUF_SIZE_MASK;
         let ret = self.buffer.read(index);
         self.buffer.zero(index);
-        self.cached_tail = self.cached_tail.wrapping_add(1);
+        self.cached_tail = self.cached_tail.wrapping_add(1) & Self::HW_PTR_MASK;
         ret
     }
 
@@ -155,6 +142,13 @@ where
     /// - `Ok(None)` if no elements or validation failed
     /// - `Err(_)` on CSR error
     pub(crate) fn try_pop(&mut self) -> io::Result<Option<Spec::Element>> {
+        // let avai = self.available()?;
+        // log::info!(
+        //     "[available] try_pop: available={}, hw_head is {}",
+        //     avai,
+        //     self.cached_hw_head
+        // );
+
         let idx_first = self.tail() & Self::BUF_SIZE_MASK;
 
         let first_element = self.buffer.read(idx_first);
