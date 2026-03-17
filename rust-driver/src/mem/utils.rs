@@ -1,37 +1,18 @@
-use std::io;
+//! Memory utility functions.
 
 use crate::mem::PAGE_SIZE;
 
-/// Pins pages in memory to prevent swapping
-///
-/// # Errors
-///
-/// Returns an error if the pages could not be locked in memory
-pub(crate) fn pin_pages(addr: u64, length: usize) -> io::Result<()> {
-    let result = unsafe { libc::mlock(addr as *const std::ffi::c_void, length) };
-    if result != 0 {
-        return Err(io::Error::new(io::ErrorKind::Other, "failed to lock pages"));
-    }
-    Ok(())
-}
-
-/// Unpins pages
-///
-/// # Errors
-///
-/// Returns an error if the pages could not be locked in memory
-pub(crate) fn unpin_pages(addr: u64, length: usize) -> io::Result<()> {
-    let result = unsafe { libc::munlock(addr as *const std::ffi::c_void, length) };
-    if result != 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            "failed to unlock pages",
-        ));
-    }
-    Ok(())
-}
-
 /// Calculates the number of pages spanned by a memory region.
+///
+/// # Arguments
+///
+/// * `addr` - Starting address of the memory region
+/// * `length` - Length of the memory region in bytes
+///
+/// # Returns
+///
+/// The number of pages that the memory region spans, accounting for
+/// page boundary crossings.
 #[allow(clippy::arithmetic_side_effects)]
 pub(crate) fn get_num_page(addr: u64, length: usize) -> usize {
     if length == 0 {

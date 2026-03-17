@@ -45,9 +45,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     mem::{
-        page::MmapMut,
-        virt_to_phy::{AddressResolver, PhysAddrResolverLinuxX86},
-        DmaBuf, DmaBufAllocator, MemoryPinner, UmemHandler,
+        mmap::MmapMut, AddressResolver, DmaBuf, DmaBufAllocator, MemoryPinner,
+        PhysAddrResolverLinuxX86, UmemHandler,
     },
     workers::{completion::Completion, send::WorkReqOpCode},
 };

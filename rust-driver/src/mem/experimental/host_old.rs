@@ -1,10 +1,17 @@
+//! Older host page allocator implementation.
+//!
+//! This is a previous implementation of host page allocation that directly
+//! uses mmap with huge pages. It's preserved for reference but has been
+//! superseded by the UDmaBufAllocator in the allocator module.
+
 use std::io;
 
 use crate::constants::PAGE_SIZE_2MB;
 
-use super::{ContiguousPages, MmapMut, PageAllocator};
+use super::page_allocator::{ContiguousPages, PageAllocator};
+use crate::mem::mmap::MmapMut;
 
-/// A page allocator for allocating pages of host memory
+/// A page allocator for allocating pages of host memory.
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct HostPageAllocator<const N: usize>;
 

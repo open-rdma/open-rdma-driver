@@ -1,3 +1,5 @@
+//! UDmaBuf allocator using the u-dma-buf kernel module.
+
 use std::{
     fs::{File, OpenOptions},
     io::{self, Read},
@@ -8,17 +10,18 @@ use std::{
 
 use crate::{constants::U_DMA_BUF_CLASS_PATH, types::PhysAddr};
 
-use super::MmapMut;
-
+use crate::mem::mmap::MmapMut;
 use crate::mem::DmaBuf;
 use crate::mem::DmaBufAllocator;
 
+/// Allocator for DMA buffers using the u-dma-buf kernel module.
 pub(crate) struct UDmaBufAllocator {
     fd: File,
     offset: usize,
 }
 
 impl UDmaBufAllocator {
+    /// Opens the udmabuf device and creates a new allocator.
     pub(crate) fn open() -> io::Result<Self> {
         let fd = OpenOptions::new()
             .read(true)
@@ -29,6 +32,7 @@ impl UDmaBufAllocator {
         Ok(Self { fd, offset: 0 })
     }
 
+    /// Returns the total size of the DMA buffer.
     pub(crate) fn size_total() -> io::Result<usize> {
         Self::read_attribute("size")?.parse().map_err(|e| {
             io::Error::new(
@@ -38,6 +42,7 @@ impl UDmaBufAllocator {
         })
     }
 
+    /// Returns the physical address of the DMA buffer.
     pub(crate) fn phys_addr() -> io::Result<u64> {
         let str = Self::read_attribute("phys_addr")?;
         u64::from_str_radix(str.trim_start_matches("0x"), 16).map_err(|e| {

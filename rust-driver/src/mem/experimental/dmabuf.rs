@@ -1,3 +1,11 @@
+//! Alternative DMA buffer allocator using udmabuf and memfd.
+//!
+//! This implementation creates DMA buffers using the udmabuf kernel module
+//! with memfd backing. It's an alternative approach that may provide different
+//! characteristics compared to the u-dma-buf0 device approach.
+//!
+//! Currently unused but preserved for reference.
+
 use nix::fcntl::{self, SealFlag};
 use nix::ioctl_write_ptr;
 use nix::sys::memfd::{memfd_create, MemFdCreateFlag};
@@ -7,7 +15,8 @@ use std::os::unix::io::{FromRawFd, IntoRawFd};
 
 use crate::constants::PAGE_SIZE_2MB;
 
-use super::page::{ContiguousPages, MmapMut, PageAllocator};
+use super::page_allocator::{ContiguousPages, PageAllocator};
+use crate::mem::mmap::MmapMut;
 
 const UDMABUF_IOCTL_TYPE: u8 = b'u';
 const UDMABUF_CREATE_NR: u8 = 0x42;
@@ -29,6 +38,7 @@ ioctl_write_ptr!(
     UdmabufCreate
 );
 
+/// DMA buffer allocator using udmabuf with memfd backing.
 pub(crate) struct DmaBufAllocator;
 
 impl DmaBufAllocator {

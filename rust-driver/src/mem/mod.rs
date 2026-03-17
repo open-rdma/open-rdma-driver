@@ -1,29 +1,47 @@
-/// Tools for converting virtual address to physicall address
-pub(crate) mod virt_to_phy;
+//! Memory management module.
+//!
+//! This module provides abstractions for memory allocation, address translation,
+//! and user memory handling in RDMA operations.
+//!
+//! # Module Structure
+//!
+//! - `address`: Address translation (virtual to physical) and PA-VA mapping
+//! - `allocator`: DMA buffer allocators (udmabuf, emulated)
+//! - `handler`: User memory handlers (host, emulated)
+//! - `mmap`: Memory-mapped region abstraction
+//! - `experimental`: Unused code preserved for reference
 
-/// Page implementation
-pub(crate) mod page;
+/// Address translation and mapping utilities
+pub(crate) mod address;
 
-pub(crate) mod dmabuf;
+/// Memory allocators for DMA buffers
+pub(crate) mod allocator;
 
-pub(crate) mod umem;
+/// User memory handler implementations
+pub(crate) mod handler;
+
+/// Memory-mapped region abstraction
+pub(crate) mod mmap;
+
+/// Experimental and unused code
+pub(crate) mod experimental;
 
 mod utils;
 
-// pub(crate) mod sim_alloc;
-
-/// PA ↔ VA bidirectional mapping for simulation mode
-pub(crate) mod pa_va_map;
-
-pub(crate) use utils::*;
+pub(crate) use utils::get_num_page;
 
 use std::{
     io,
     ops::{Deref, DerefMut},
 };
 
-use crate::{mem::virt_to_phy::AddressResolver, types::{PhysAddr, VirtAddr}};
-use page::MmapMut;
+use crate::types::PhysAddr;
+use mmap::MmapMut;
+
+// Re-export commonly used types
+pub(crate) use address::{AddressResolver, PaVaMap, PhysAddrResolverLinuxX86};
+pub(crate) use allocator::{EmulatedPageAllocator, UDmaBufAllocator};
+pub(crate) use handler::{EmulatedUmemHandler, HostUmemHandler, MemoryPinner, UmemHandler};
 
 /// Number of bits for a 4KB page size
 #[cfg(all(target_arch = "x86_64", feature = "page_size_4k"))]
@@ -33,19 +51,19 @@ pub(crate) const PAGE_SIZE_BITS: u8 = 12;
 #[cfg(feature = "page_size_2m")]
 pub(crate) const PAGE_SIZE_BITS: u8 = 21;
 
-/// Size of a 2MB huge page in bytes
+/// Size of a page in bytes
 pub(crate) const PAGE_SIZE: usize = 1 << PAGE_SIZE_BITS;
 
 /// Asserts system page size matches the expected page size.
 ///
 /// # Panics
 ///
-/// Panics if the system page size does not equal `HUGE_PAGE_2MB_SIZE`.
+/// Panics if the system page size does not equal `PAGE_SIZE`.
 pub(crate) fn assert_equal_page_size() {
     assert_eq!(page_size(), PAGE_SIZE, "page size not match");
 }
 
-/// Returns the current page size
+/// Returns the current system page size.
 #[allow(
     unsafe_code, // Safe because sysconf(_SC_PAGESIZE) is guaranteed to return a valid value.
     clippy::as_conversions,
@@ -56,40 +74,21 @@ pub(crate) fn page_size() -> usize {
     unsafe { libc::sysconf(libc::_SC_PAGESIZE) as usize }
 }
 
-// pub(crate) struct PageWithPhysAddr {
-//     pub(crate) page: page::ContiguousPages<1>,
-//     pub(crate) phys_addr: PhysAddr,
-// }
-
-// impl PageWithPhysAddr {
-//     pub(crate) fn new(page: page::ContiguousPages<1>, phys_addr: PhysAddr) -> Self {
-//         Self { page, phys_addr }
-//     }
-
-//     pub(crate) fn alloc<A, R>(allocator: &mut A, resolver: &R) -> io::Result<Self>
-//     where
-//         A: page::PageAllocator<1>,
-//         R: AddressResolver,
-//     {
-//         let page = allocator.alloc()?;
-//         let phys_addr = resolver
-//             .virt_to_phys(VirtAddr::new(page.addr()))?
-//             .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
-
-//         Ok(Self { page, phys_addr })
-//     }
-// }
-
+/// A DMA buffer with its physical address.
 pub(crate) struct DmaBuf {
+    /// The underlying memory-mapped buffer
     pub(crate) buf: MmapMut,
+    /// The physical address of the buffer
     pub(crate) phys_addr: PhysAddr,
 }
 
 impl DmaBuf {
+    /// Creates a new DMA buffer.
     pub(crate) fn new(buf: MmapMut, phys_addr: PhysAddr) -> Self {
         Self { buf, phys_addr }
     }
 
+    /// Returns the physical address of the buffer.
     pub(crate) fn phys_addr(&self) -> PhysAddr {
         self.phys_addr
     }
@@ -109,27 +108,12 @@ impl DerefMut for DmaBuf {
     }
 }
 
+/// Trait for allocating DMA buffers.
 pub(crate) trait DmaBufAllocator {
+    /// Allocates a DMA buffer of the specified length.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if allocation fails.
     fn alloc(&mut self, len: usize) -> io::Result<DmaBuf>;
 }
-
-pub(crate) trait MemoryPinner {
-    /// Pins pages in memory to prevent swapping
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the pages could not be locked in memory
-    fn pin_pages(&self, addr: VirtAddr, length: usize) -> io::Result<()>;
-
-    /// Unpins previously pinned pages
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the pages could not be locked in memory
-    fn unpin_pages(&self, addr: VirtAddr, length: usize) -> io::Result<()>;
-}
-
-pub(crate) trait UmemHandler: AddressResolver + MemoryPinner {}
-
-// Re-export UmemHandler implementations from umem submodule
-pub(crate) use umem::{EmulatedUmemHandler, HostUmemHandler};

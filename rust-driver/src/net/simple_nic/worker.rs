@@ -10,7 +10,7 @@ use std::{
 use log::error;
 
 use crate::{
-    mem::{page::MmapMut, DmaBuf},
+    mem::{mmap::MmapMut, DmaBuf},
     ring::{
         buffer::{desc_ring::DmaBuffer, ConsumerRingDefault, ProducerRingDefault},
         descriptors::simple_nic::SimpleNicTxQueueDesc,
@@ -121,6 +121,8 @@ impl<Dev: DeviceAdaptor> FrameTxQueue<Dev> {
 
 impl<Dev: DeviceAdaptor + Send + 'static> FrameTx for FrameTxQueue<Dev> {
     fn send(&mut self, buf: &[u8]) -> io::Result<()> {
+        log::info!("Sending frame of size {} bytes", buf.len());
+
         let desc = self
             .build_desc(buf)
             .unwrap_or_else(|| unreachable!("buffer is smaller than u32::MAX"));

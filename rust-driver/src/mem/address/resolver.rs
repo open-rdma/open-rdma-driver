@@ -1,3 +1,5 @@
+//! Virtual to physical address resolution.
+
 use std::{
     fs::File,
     io::{self, Read, Seek},
@@ -23,6 +25,7 @@ fn get_base_page_size() -> u64 {
     unsafe { libc::sysconf(libc::_SC_PAGESIZE) as u64 }
 }
 
+/// Trait for resolving virtual addresses to physical addresses.
 pub(crate) trait AddressResolver {
     /// Converts a virtual address to a physical address
     ///
@@ -74,8 +77,12 @@ pub(crate) trait AddressResolver {
     }
 }
 
+/// Type alias for the default physical address resolver.
 pub(crate) type PhysAddrResolver = PhysAddrResolverLinuxX86;
 
+/// Physical address resolver for Linux x86-64 systems.
+///
+/// Uses `/proc/self/pagemap` to translate virtual addresses to physical addresses.
 pub(crate) struct PhysAddrResolverLinuxX86;
 
 #[allow(

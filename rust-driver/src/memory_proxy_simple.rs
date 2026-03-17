@@ -23,7 +23,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crate::mem::pa_va_map::PaVaMap;
+use crate::mem::PaVaMap;
 
 /// Simplified memory access request from simulator
 #[derive(Debug, Clone, Serialize, Deserialize)]

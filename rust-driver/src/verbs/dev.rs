@@ -13,13 +13,10 @@ use crate::{
     constants::{DEVICE_ID, PCI_SYSFS_BUS_PATH, VENDER_ID},
     error::Result,
     mem::{
-        page::host::UDmaBufAllocator, page::EmulatedPageAllocator, EmulatedUmemHandler,
-        HostUmemHandler,
+        EmulatedPageAllocator, EmulatedUmemHandler, HostUmemHandler, PaVaMap, UDmaBufAllocator,
     },
     ring::csr::{emulated::EmulatedDevice, hardware::SysfsPciCsrAdaptor},
 };
-
-use crate::mem::pa_va_map::PaVaMap;
 use crate::ring::traits::DeviceAdaptor;
 
 use super::mock::{MockDeviceAdaptor, MockDmaBufAllocator, MockUmemHandler};

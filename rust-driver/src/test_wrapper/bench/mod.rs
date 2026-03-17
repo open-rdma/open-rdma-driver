@@ -16,10 +16,7 @@ pub mod descs;
 
 use std::io;
 
-use crate::mem::{
-    page::{ContiguousPages, HostPageAllocator, PageAllocator},
-    virt_to_phy::{AddressResolver, PhysAddrResolverLinuxX86},
-};
+use crate::mem::{AddressResolver, PhysAddrResolverLinuxX86};
 
 #[inline]
 pub fn virt_to_phy_bench_wrapper<Vas>(virt_addrs: Vas) -> io::Result<Vec<Option<u64>>>

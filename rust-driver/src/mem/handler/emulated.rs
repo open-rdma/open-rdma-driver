@@ -1,18 +1,18 @@
+//! Emulated mode user memory handler.
+
 use std::{io, sync::Arc};
 
 use crate::{
     mem::{
-        get_num_page,
-        pa_va_map::PaVaMap,
-        virt_to_phy::{AddressResolver, PhysAddrResolverLinuxX86},
-        PAGE_SIZE,
+        address::{AddressResolver, PaVaMap, PhysAddrResolverLinuxX86},
+        get_num_page, PAGE_SIZE,
     },
     types::{PageAlignedVirtAddr, PhysAddr, VirtAddr},
 };
 
-use super::super::{MemoryPinner, UmemHandler};
+use super::{MemoryPinner, UmemHandler};
 
-/// Emulated mode user memory handler
+/// Emulated mode user memory handler.
 ///
 /// Uses PA-VA mapping table to simulate address translation, suitable for simulation environment.
 /// 需要真正地pin住内存，来模仿实际的情况
@@ -22,6 +22,7 @@ pub(crate) struct EmulatedUmemHandler {
 }
 
 impl EmulatedUmemHandler {
+    /// Creates a new emulated mode user memory handler.
     pub(crate) fn new(pa_va_map: Arc<parking_lot::RwLock<PaVaMap>>) -> Self {
         Self {
             resolver: PhysAddrResolverLinuxX86,

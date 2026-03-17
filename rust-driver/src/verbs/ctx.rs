@@ -7,7 +7,7 @@ use crate::{
     config::DeviceConfig,
     constants::CARD_MAC_ADDRESS,
     mem::{
-        get_num_page, virt_to_phy::AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE,
+        get_num_page, AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE,
     },
     net::{
         config::NetworkConfig,

@@ -1,18 +1,21 @@
+//! Emulated page allocator for simulation mode.
+
 use std::io;
 
 use crate::{
-    mem::{pa_va_map::PaVaMap, DmaBuf, DmaBufAllocator, PAGE_SIZE},
+    mem::{address::PaVaMap, mmap::MmapMut, DmaBuf, DmaBufAllocator, PAGE_SIZE},
     types::{PhysAddr, VirtAddr},
 };
 
-use super::{ContiguousPages, MmapMut, PageAllocator};
-
 const DEFAULT_ALLOCATOR_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
-/// A page allocator for allocating pages of emulated physical memory
+/// A page allocator for allocating pages of emulated physical memory.
+///
+/// This allocator pre-allocates a large block of memory and divides it into
+/// individual pages for allocation.
 #[derive(Debug)]
 pub(crate) struct EmulatedPageAllocator<const N: usize> {
-    /// Inner
+    /// Stack of available memory pages
     inner: Vec<MmapMut>,
 }
 
@@ -24,13 +27,17 @@ impl<const N: usize> EmulatedPageAllocator<N> {
     );
 
     /// Creates a new `EmulatedPageAllocator`
+    ///
+    /// # Arguments
+    /// * `size` - Optional size of the memory pool (defaults to 128 MiB)
+    /// * `pa_va_map` - PA-VA mapping table to register the allocated memory
     #[allow(clippy::as_conversions)] // usize to *mut c_void is safe
     pub(crate) fn new(size: Option<usize>, pa_va_map: &mut PaVaMap) -> Self {
         let size = size.unwrap_or(DEFAULT_ALLOCATOR_SIZE);
         let ptr = unsafe {
             libc::mmap(
                 std::ptr::null_mut(),
-                size, // 修复: 分配完整的 size 大小的内存
+                size,
                 libc::PROT_READ | libc::PROT_WRITE,
                 libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
                 -1,
@@ -42,7 +49,7 @@ impl<const N: usize> EmulatedPageAllocator<N> {
             panic!("Failed to allocate memory");
         }
 
-        // WARN: 假设va永远不会与真实的pa重叠
+        // WARN: Assumes VA will never overlap with real PA
         pa_va_map.insert(PhysAddr::new(ptr as u64), VirtAddr::new(ptr as u64), size);
 
         let inner: Vec<_> = (0..size)
@@ -54,16 +61,6 @@ impl<const N: usize> EmulatedPageAllocator<N> {
     }
 }
 
-impl<const N: usize> PageAllocator<N> for EmulatedPageAllocator<N> {
-    #[allow(unsafe_code)]
-    fn alloc(&mut self) -> io::Result<ContiguousPages<N>> {
-        self.inner
-            .pop()
-            .map(ContiguousPages::new)
-            .ok_or(io::ErrorKind::OutOfMemory.into())
-    }
-}
-
 impl DmaBufAllocator for EmulatedPageAllocator<1> {
     #[allow(clippy::unwrap_in_result, clippy::unwrap_used)]
     fn alloc(&mut self, _len: usize) -> io::Result<DmaBuf> {
@@ -71,7 +68,7 @@ impl DmaBufAllocator for EmulatedPageAllocator<1> {
             .inner
             .pop()
             .ok_or(io::Error::from(io::ErrorKind::OutOfMemory))?;
-        // WARN: 假设 DMA buffer 的 va = pa (仿真模式简化假设)
+        // WARN: Assumes DMA buffer VA = PA (emulation simplification)
         let phys_addr = PhysAddr::new(buf.as_ptr() as u64);
         Ok(DmaBuf::new(buf, phys_addr))
     }

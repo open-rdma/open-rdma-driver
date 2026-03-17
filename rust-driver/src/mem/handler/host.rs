@@ -1,20 +1,23 @@
+//! Host mode user memory handler.
+
 use std::io;
 
 use crate::{
-    mem::virt_to_phy::{AddressResolver, PhysAddrResolverLinuxX86},
+    mem::address::{AddressResolver, PhysAddrResolverLinuxX86},
     types::{PageAlignedPhysAddr, PageAlignedVirtAddr, PhysAddr, VirtAddr},
 };
 
-use super::super::{MemoryPinner, UmemHandler};
+use super::{MemoryPinner, UmemHandler};
 
-/// Host mode user memory handler
+/// Host mode user memory handler.
 ///
-/// Uses real physical address resolution and locks pages via mlock
+/// Uses real physical address resolution and locks pages via mlock.
 pub(crate) struct HostUmemHandler {
     resolver: PhysAddrResolverLinuxX86,
 }
 
 impl HostUmemHandler {
+    /// Creates a new host mode user memory handler.
     pub(crate) fn new() -> Self {
         Self {
             resolver: PhysAddrResolverLinuxX86,

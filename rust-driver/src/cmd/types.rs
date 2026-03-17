@@ -1,5 +1,5 @@
 use crate::{
-    mem::page::ContiguousPages,
+    mem::experimental::page_allocator::ContiguousPages,
     types::{PhysAddr, VirtAddr},
 };
 
