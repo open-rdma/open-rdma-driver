@@ -14,7 +14,7 @@ pub(crate) type ConsumerRingDefault<Dev, Spec> = ConsumerRing<Dev, Spec, RING_BU
 pub(crate) type ProducerRingDefault<Dev, Spec> = ProducerRing<Dev, Spec, RING_BUF_LEN_BITS>;
 
 /// Number of bits used to represent the length of the ring buffer.
-const RING_BUF_LEN_BITS: u8 = 4;
+const RING_BUF_LEN_BITS: u8 = 12;
 /// Highest bit of the ring buffer
 pub(crate) const RING_BUF_LEN: usize = 1 << RING_BUF_LEN_BITS;
 
