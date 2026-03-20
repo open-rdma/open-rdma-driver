@@ -142,12 +142,14 @@ where
     /// - `Ok(None)` if no elements or validation failed
     /// - `Err(_)` on CSR error
     pub(crate) fn try_pop(&mut self) -> io::Result<Option<Spec::Element>> {
-        // let avai = self.available()?;
-        // log::info!(
-        //     "[available] try_pop: available={}, hw_head is {}",
-        //     avai,
-        //     self.cached_hw_head
-        // );
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        let avai = self.available()?;
+        log::info!(
+            "[available] try_pop: available={}, hw_head is {}",
+            avai,
+            self.cached_hw_head
+        );
 
         let idx_first = self.tail() & Self::BUF_SIZE_MASK;
 

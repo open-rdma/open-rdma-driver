@@ -70,6 +70,7 @@ pub(crate) trait SingleThreadTaskWorker {
                         error!("failed to recv task from channel");
                         break;
                     }
+                    std::thread::sleep(Duration::from_millis(2));
                 }
                 info!("worker {name} exited");
             })
