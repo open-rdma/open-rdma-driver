@@ -1066,11 +1066,13 @@ checksum = "b4ce411919553d3f9fa53a0880544cda985a112117a0444d5ff1e870a893d6ea"
 [[package]]
 name = "pagemap"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9b10bd736861cab1e4a800e7547d08f5103929b3549a45a23408aaff0c1ee71"
+source = "git+https://github.com/pwhMass/pagemap-rs.git?rev=7413e694e509#7413e694e50919e7b6aa48466a240948c791cd40"
 dependencies = [
  "bitflags 1.3.2",
  "libc",
+ "log",
+ "once_cell",
+ "regex",
  "thiserror 1.0.69",
 ]
 

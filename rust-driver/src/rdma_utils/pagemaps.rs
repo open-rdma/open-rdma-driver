@@ -1,26 +1,39 @@
-use crate::types::VirtAddr;
+use crate::{mem::PAGE_SIZE, types::VirtAddr};
 
 pub(crate) fn check_addr_is_anon_hugepage(addr: VirtAddr, length: usize) -> bool {
     use pagemap::PageMap;
 
     let pid = std::process::id() as u64;
-
+    println!("[ADDR_DEBUG] check_addr_is_anon_hugepage: pid={pid}");
     // Instantiate a new pagemap::PageMap.
-    let mut pm = PageMap::new(pid).unwrap();
-    let me = pm
-        .maps()
-        .unwrap()
-        .into_iter()
-        .find(|me| me.memory_region().contains(addr.as_u64()))
-        .expect("mapping not found");
-    if addr.as_u64() + length as u64 > me.memory_region().last_address() + 1 {
+    let pm = PageMap::new(pid).unwrap();
+    log::debug!(
+        "[ADDR_DEBUG] check_addr_is_anon_hugepage: pid={}, addr={addr:x}, length={length}",
+        pid,
+    );
+
+    // use std::fs::File;
+    // let mut buf = String::new();
+
+    // let _ = File::open("/proc/self/smaps")
+    //     .unwrap()
+    //     .read_to_string(&mut buf)
+    //     .unwrap();
+
+    // println!("[ADDR_DEBUG] /proc/self/smaps line: \n {buf}");
+
+    let smaps = pm.smaps().unwrap();
+    let va_region = smaps
+        .iter()
+        .find(|a| a.maps_entry().vma().contains(addr.as_u64()))
+        .unwrap();
+
+    if addr.as_u64() + length as u64 > va_region.maps_entry().vma().last_address() + 1 {
         panic!("mapping length exceeds region");
     }
-    log::info!(
-        "[ADDR_DEBUG] addr: {addr:x}, length: {length},mapping: {}",
-        me
-    );
-    me.path().is_some_and(|p| p.ends_with("anon_hugepage"))
+
+    va_region.kernel_page_size() == PAGE_SIZE as u64
+        && va_region.mmu_page_size() == PAGE_SIZE as u64
 }
 
 #[test]
