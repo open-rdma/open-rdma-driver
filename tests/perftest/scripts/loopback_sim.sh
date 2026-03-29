@@ -1,8 +1,10 @@
 
-trap "kill 0" SIGINT
+PERF_TEST_PARAMS="--loopback --use_hugepages --data_validation_debug -t 1 -x 3"
+RUST_LOG=${RUST_LOG:-info}
+PERFTEST_CMD="ib_write_bw"
 
 
-
+# 设置目录路径
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 DRIVER_DIR=$(cd "$SCRIPT_DIR/../../.." && pwd)
 
@@ -17,7 +19,7 @@ source $SCRIPT_DIR/../../common/test_common.sh
 setup_signal_handler
 
 # 打印测试开始信息
-print_test_start "loopback"
+print_test_start "RCCL nompi sim"
 
 # 初始化测试环境
 init_test_environment
@@ -25,26 +27,16 @@ init_test_environment
 # 编译 Rust 驱动
 build_rust_driver "sim"
 
-# 设置运行时环境
-setup_runtime_environment
-
-
-# 运行 loopback 测试，参数是消息长度
-MSG_LEN=${1:-209600}  # 默认 4096 字节
-ROUND=${2:-10}  # 默认 10 轮
-RUST_LOG=${RUST_LOG:-info}  # 默认 info 级别日志
-
-echo "Running loopback test with MSG_LEN=$MSG_LEN"
+# 启动 RTL 模拟器（2个实例）
+start_rtl_simulators 1 "loopback"
 
 
 
-PERF_TEST_PARAMS="--loopback --use_hugepages --data_validation_debug --rate_limit=100 --rate_units=M -t 128 -x 3"
-
+cd $SCRIPT_DIR/..
 sudo env \
 	RUST_LOG=${RUST_LOG} \
 	LD_LIBRARY_PATH="$LD_LIBRARY_PATH" \
-	ib_write_bw -d bluerdma0 $PERF_TEST_PARAMS &> $LOG_DIR/server.log &
-
+	$PERFTEST_CMD -d bluerdma0 $PERF_TEST_PARAMS &> $LOG_DIR/client.log  &
 
 wait
 
