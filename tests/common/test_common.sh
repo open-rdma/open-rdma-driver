@@ -57,21 +57,29 @@ init_test_environment() {
     export RTL_DIR
 }
 
-# 编译 Rust 驱动 (dtld-ibverbs)
+# 编译 Rust 驱动 (dtld-ibverbs) 并设置运行时 LD_LIBRARY_PATH
 # 参数:
-#   $1: feature - 编译特性 ("sim" 或 "mock")
+#   $1: feature - 编译特性 ("sim" 或 "mock"，默认 "sim")
+#   $2: profile - 编译模式 ("debug" 或 "release"，默认 "debug")
+# 副作用:
+#   设置并导出 LD_LIBRARY_PATH
 build_rust_driver() {
     local feature=${1:-"sim"}
+    local profile=${2:-"debug"}
 
     if [ -z "$DTLD_DIR" ]; then
         echo "Error: DTLD_DIR not set. Call init_test_environment first."
         exit 1
     fi
 
-    echo "Building Rust driver with feature: $feature"
+    echo "Building Rust driver with feature: $feature, profile: $profile"
 
     cd "$DTLD_DIR"
-    cargo build --no-default-features --features=$feature
+    if [ "$profile" = "release" ]; then
+        cargo build --no-default-features --features=$feature --release
+    else
+        cargo build --no-default-features --features=$feature
+    fi
 
     if [ $? -ne 0 ]; then
         echo "Error: Failed to build Rust driver"
@@ -79,6 +87,13 @@ build_rust_driver() {
     fi
 
     echo "Rust driver built successfully"
+
+    # 编译 rdma-core
+    (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
+
+    # 根据编译模式设置 LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH="$DTLD_DIR/target/$profile:$DTLD_DIR/rdma-core-55.0/build/lib"
+    echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 }
 
 start_soft_switch() {
@@ -227,25 +242,6 @@ start_rtl_simulators() {
     export RTL_PIDS
 }
 
-# 设置运行时环境变量
-setup_runtime_environment() {
-    if [ -z "$DTLD_DIR" ]; then
-        echo "Error: DTLD_DIR not set. Call init_test_environment first."
-        exit 1
-    fi
-
-    echo "Setting up runtime environment..."
-
-
-    # 编译 rdma-core
-    (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
-
-
-    # 设置 LD_LIBRARY_PATH
-    export LD_LIBRARY_PATH="$DTLD_DIR/target/debug:$DTLD_DIR/rdma-core-55.0/build/lib"
-
-    echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
-}
 
 # 编译测试程序
 # 参数:

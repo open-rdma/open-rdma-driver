@@ -20,7 +20,7 @@ print_test_start "loopback"
 # 初始化测试环境
 init_test_environment
 
-# 编译 Rust 驱动
+# 编译 Rust 驱动（同时设置 LD_LIBRARY_PATH）
 build_rust_driver "sim"
 
 # 启动 RTL 模拟器（1个实例）
@@ -28,9 +28,6 @@ start_rtl_simulators 1 "loopback"
 
 # 编译测试程序
 build_test_program "$SCRIPT_DIR/.."
-
-# 设置运行时环境
-setup_runtime_environment
 
 # 运行 loopback 测试，参数是消息长度
 MSG_LEN=${1:-2096}  # 默认 4096 字节

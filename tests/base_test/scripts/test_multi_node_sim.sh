@@ -37,7 +37,7 @@ print_test_start "$TEST_PROGRAM"
 # 初始化测试环境
 init_test_environment
 
-# 编译 Rust 驱动
+# 编译 Rust 驱动（同时设置 LD_LIBRARY_PATH）
 build_rust_driver "sim"
 
 # 启动 soft switch 模拟器
@@ -48,9 +48,6 @@ start_rtl_simulators_with_switch $2 "$TEST_PROGRAM"
 
 # 编译测试程序
 build_test_program "$SCRIPT_DIR/.."
-
-# 设置运行时环境
-setup_runtime_environment
 
 # 检查测试程序是否存在
 if [ ! -f "$PROGRAM_DIR/$TEST_PROGRAM" ]; then
