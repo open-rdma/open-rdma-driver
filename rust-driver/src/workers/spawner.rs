@@ -34,6 +34,7 @@ pub(crate) trait SingleThreadPollingWorker {
                     if let Some(task) = self.poll() {
                         self.process(task);
                     }
+                    // std::thread::sleep(Duration::from_nanos(10000));
                 }
                 info!("worker {name} exited");
             })

@@ -220,9 +220,25 @@ struct QueuePairMessageTracker {
 impl QueuePairMessageTracker {
     fn append(&mut self, event: Event) {
         match event {
-            Event::Send(x) => self.send.append(x),
-            Event::Recv(x) => self.recv.append(x),
+            Event::Send(x) => {
+                debug!(
+                    "QueuePairMessageTracker::append Send: qpn={} op={:?} meta={:?} wr_id={}",
+                    x.qpn, x.op, x.meta, x.wr_id
+                );
+                self.send.append(x);
+            }
+            Event::Recv(x) => {
+                debug!(
+                    "QueuePairMessageTracker::append Recv: qpn={} op={:?} meta={:?} ack_req={}",
+                    x.qpn, x.op, x.meta, x.ack_req
+                );
+                self.recv.append(x);
+            }
             Event::PostRecv(x) => {
+                debug!(
+                    "QueuePairMessageTracker::append PostRecv: qpn={} wr_id={}",
+                    x.qpn, x.wr_id
+                );
                 self.post_recv_queue.push_back(x);
             }
         }

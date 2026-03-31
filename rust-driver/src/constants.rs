@@ -30,6 +30,7 @@ pub(crate) const CARD_MAC_ADDRESS_OCTETS: [u8; 6] = [0xAA, 0xBB, 0xCC, 0xDD, 0xE
 pub(crate) const MAX_PD_CNT: usize = 256;
 
 /// (Max) size of a single WR chunk
+// pub(crate) const WR_CHUNK_SIZE: u32 = 0x4000;
 pub(crate) const WR_CHUNK_SIZE: u32 = 0x10000;
 
 /// Ack timeout config

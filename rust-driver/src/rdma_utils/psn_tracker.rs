@@ -1,4 +1,5 @@
 use bitvec::vec::BitVec;
+use log::debug;
 
 use crate::rdma_utils::psn::Psn;
 
@@ -10,16 +11,29 @@ pub(crate) struct LocalAckTracker {
 
 impl LocalAckTracker {
     pub(crate) fn ack_one(&mut self, psn: Psn) -> Option<Psn> {
+        debug!(
+            "LocalAckTracker::ack_one enter: psn={:?} tracker={:?}",
+            psn, self
+        );
         self.psn_tracker.ack_one(psn)
     }
 
     pub(crate) fn ack_bitmap(&mut self, base_psn: Psn, bitmap: u128) -> Option<Psn> {
+        debug!(
+            "LocalAckTracker::ack_bitmap enter: base_psn={:?} bitmap={:#034x} tracker={:?}",
+            base_psn, bitmap, self
+        );
         let x = self.psn_tracker.ack_range(self.psn_pre, base_psn);
         let y = self.psn_tracker.ack_bitmap(base_psn, bitmap);
         if self.psn_pre < base_psn {
             self.psn_pre = base_psn;
         }
-        y.or(x)
+        let result = y.or(x);
+        debug!(
+            "LocalAckTracker::ack_bitmap exit: result={:?} tracker={:?}",
+            result, self
+        );
+        result
     }
 
     pub(crate) fn nak_bitmap(
@@ -29,13 +43,22 @@ impl LocalAckTracker {
         psn_now: Psn,
         now_bitmap: u128,
     ) -> Option<Psn> {
+        debug!(
+            "LocalAckTracker::nak_bitmap enter: psn_pre={:?} pre_bitmap={:#034x} psn_now={:?} now_bitmap={:#034x} tracker={:?}",
+            psn_pre, pre_bitmap, psn_now, now_bitmap, self
+        );
         let x = self.psn_tracker.ack_range(self.psn_pre, psn_pre);
         let y = self.psn_tracker.ack_bitmap(psn_pre, pre_bitmap);
         let z = self.psn_tracker.ack_bitmap(psn_now, now_bitmap);
         if self.psn_pre < psn_now {
             self.psn_pre = psn_now;
         }
-        z.or(y).or(x)
+        let result = z.or(y).or(x);
+        debug!(
+            "LocalAckTracker::nak_bitmap exit: result={:?} tracker={:?}",
+            result, self
+        );
+        result
     }
 
     pub(crate) fn base_psn(&self) -> Psn {

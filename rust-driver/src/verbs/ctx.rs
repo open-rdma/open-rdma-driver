@@ -6,9 +6,7 @@ use crate::{
     cmd::{CommandConfigurator, MttUpdate, PgtUpdate, RecvBufferMeta, UpdateQp},
     config::DeviceConfig,
     constants::CARD_MAC_ADDRESS,
-    mem::{
-        get_num_page, AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE,
-    },
+    mem::{get_num_page, AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE},
     net::{
         config::NetworkConfig,
         reader::NetConfigReader,
@@ -635,7 +633,7 @@ where
     }
 
     fn post_send(&mut self, qpn: u32, wr: SendWr) -> Result<()> {
-        debug!("post_send called, qpn is {qpn}, wr is {wr:?}");
+        // log::info!("post_send called, qpn is {qpn}, wr is {wr:?}");
 
         // 统一处理：所有操作都先加入 pending 队列
         if !self.pending_send_queue_table.try_push(qpn, wr) {

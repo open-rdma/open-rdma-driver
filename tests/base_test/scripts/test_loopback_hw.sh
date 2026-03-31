@@ -37,6 +37,7 @@ echo "Running loopback test with MSG_LEN=$MSG_LEN"
 echo "Running hardware test with PCI device reset..."
 echo 1 | sudo tee /sys/bus/pci/devices/0000:01:00.0/remove
 echo 1 | sudo tee /sys/bus/pci/rescan
+echo 1 | sudo tee /sys/bus/pci/devices/0000:01:00.0/reset
 sudo setpci  -s 01:00.0 COMMAND=0x02
 sudo setpci  -s 01:00.0 98.b=0x16
 sudo setpci  -s 01:00.0 CAP_EXP+28.w=0x1000
@@ -45,7 +46,7 @@ sudo setpci  -s 01:00.0 CAP_EXP+28.w=0x1000
 
 cd $SCRIPT_DIR/..
 # sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" ./build/bin/loopback $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
-sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" ./build/bin/small_pack_loopback $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
+sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" ./build/bin/loopback_pertest $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
 
 LOOPBACK_PID=$!
 

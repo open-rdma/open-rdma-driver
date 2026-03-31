@@ -249,6 +249,7 @@ impl RdmaWriteWorker {
 
         let fragmenter = WrChunkFragmenter::new(wr, qp_params, psn);
         for chunk in fragmenter {
+            log::debug!("RdmaWriteWorker sending chunk: {:?}", chunk);
             self.send_handle.send(chunk);
         }
 

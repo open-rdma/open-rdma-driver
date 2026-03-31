@@ -23,7 +23,7 @@ print_test_start "loopback"
 init_test_environment
 
 # 编译 Rust 驱动（release 模式，同时设置 LD_LIBRARY_PATH）
-build_rust_driver "hw" "release"
+build_rust_driver "hw"
 
 
 # 运行 loopback 测试，参数是消息长度
@@ -43,7 +43,7 @@ sudo setpci  -s 01:00.0 CAP_EXP+28.w=0x1000
 
 
 MSG_SIZE=${MSG_SIZE:-65536}
-PERF_TEST_PARAMS="--loopback --use_hugepages -t 32 -x 3 -s ${MSG_SIZE}"
+PERF_TEST_PARAMS="--loopback -q 2 --use_hugepages -t 8 -x 3 -s ${MSG_SIZE}"
 
 sudo env \
 	RUST_LOG=${RUST_LOG} \

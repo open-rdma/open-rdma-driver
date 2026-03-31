@@ -1,3 +1,4 @@
+#![allow(unused)]
 use super::desc_ring::DmaBuffer;
 use crate::ring::csr::ring_csr::ReaderOps;
 use crate::ring::{
@@ -7,7 +8,8 @@ use crate::ring::{
 use std::fmt::Debug;
 use std::{
     io,
-    sync::atomic::{fence, Ordering},
+    sync::atomic::{fence, AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 // ============================================================================
@@ -142,12 +144,36 @@ where
     /// - `Ok(None)` if no elements or validation failed
     /// - `Err(_)` on CSR error
     pub(crate) fn try_pop(&mut self) -> io::Result<Option<Spec::Element>> {
-        // let avai = self.available()?;
-        // log::info!(
-        //     "[available] try_pop: available={}, hw_head is {}",
-        //     avai,
-        //     self.cached_hw_head
-        // );
+        // std::thread::sleep(std::time::Duration::from_millis(1));
+
+        let avai = self.available()?;
+        if avai > 4000 {
+            log::warn!(
+                "try_pop near overflow: available={}, hw_head is {}, tail is {}",
+                avai,
+                self.cached_hw_head,
+                self.cached_tail
+            );
+        }
+        {
+            static LAST_LOG_SECS: AtomicU64 = AtomicU64::new(0);
+            let now_secs = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let last = LAST_LOG_SECS.load(Ordering::Relaxed);
+            if now_secs > last
+                && LAST_LOG_SECS
+                    .compare_exchange(last, now_secs, Ordering::Relaxed, Ordering::Relaxed)
+                    .is_ok()
+            {
+                log::info!(
+                    "[available] try_pop: available={}, hw_head is {}",
+                    avai,
+                    self.cached_hw_head
+                );
+            }
+        }
 
         let idx_first = self.tail() & Self::BUF_SIZE_MASK;
 
