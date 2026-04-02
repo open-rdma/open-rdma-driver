@@ -452,17 +452,17 @@ where
         // TODO: makes updates atomic
         self.cmd_controller.update_mtt(mtt_update);
         let mut phys_addrs = phys_addrs.into_iter();
+        let mut va_start_for_debug = addr & !(PAGE_SIZE as u64 - 1);
         for PgtEntry { index, count } in chunks(pgt_entry) {
-            let bytes: Vec<u8> = phys_addrs
-                .by_ref()
-                .take(count as usize)
+            let chunk_phys_addrs: Vec<_> = phys_addrs.by_ref().take(count as usize).collect();
+            let bytes: Vec<u8> = chunk_phys_addrs
+                .iter()
                 .flat_map(|pa| pa.as_u64().to_ne_bytes())
                 .collect();
             buf.copy_from(0, &bytes);
             let pgt_update = PgtUpdate::new(self.mtt_buffer.phys_addr, index, count - 1);
             debug!("new pgt update request: {pgt_update:?}");
-            let mut va_start_for_debug = addr & (!(PAGE_SIZE as u64));
-            for phy_addr in &phys_addrs_for_debug {
+            for phy_addr in &chunk_phys_addrs {
                 debug!(
                     "pgt map va -> pa: 0x{va_start_for_debug:x} -> 0x{:x}",
                     phy_addr.as_u64()
