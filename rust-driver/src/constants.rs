@@ -12,7 +12,7 @@ pub(crate) const MAX_MSN_SIZE_BITS: usize = 16;
 /// Maximum size of the PSN window. This represents the maximum number outstanding PSNs.
 pub(crate) const MAX_MSN_WINDOW: usize = 1 << (MAX_MSN_SIZE_BITS - 1);
 
-pub(crate) const MAX_QP_CNT: usize = 1024;
+pub(crate) const MAX_QP_CNT: usize = 32;
 pub(crate) const QPN_KEY_PART_WIDTH: u32 = 8;
 pub(crate) const QPN_IDX_PART_WIDTH: u32 = 32 - QPN_KEY_PART_WIDTH;
 
@@ -48,11 +48,11 @@ pub(crate) const U_DMA_BUF_CLASS_PATH: &str = "/sys/class/u-dma-buf/udmabuf0";
 
 pub(crate) const PAGE_SIZE_2MB: usize = 1 << 21;
 
-pub(crate) const MAX_MR_CNT: usize = 8192;
+pub(crate) const MAX_MR_CNT: usize = 64;
 pub(crate) const LR_KEY_KEY_PART_WIDTH: u32 = 8;
 pub(crate) const LR_KEY_IDX_PART_WIDTH: u32 = 32 - LR_KEY_KEY_PART_WIDTH;
 /// Maximum number of entries in the secodn stage table
-pub(crate) const PGT_LEN: usize = 0x20000;
+pub(crate) const PGT_LEN: usize = 1 << 7;
 
 pub(crate) const VENDER_ID: u16 = 0x1172;
 pub(crate) const DEVICE_ID: u16 = 0x0000;
