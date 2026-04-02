@@ -185,14 +185,14 @@ unsafe impl RdmaCtxOps for BlueRdmaCore {
     ) -> ::std::os::raw::c_int {
         unsafe {
             (*device_attr) = ibverbs_sys::ibv_device_attr {
-                max_qp: 256,
+                max_qp: 32,
                 max_qp_wr: 64,
                 max_sge: 1,
                 max_sge_rd: 1,
                 max_cq: 256,
                 max_cqe: 4096,
-                max_mr: 256,
-                max_pd: 256,
+                max_mr: 64,
+                max_pd: 64,
                 phys_port_cnt: 1,
                 ..Default::default()
             };
