@@ -172,46 +172,104 @@ impl RdmaWriteWorker {
     }
 
     fn write(&mut self, qpn: u32, wr: SendWrRdma) -> io::Result<()> {
+        debug!("======== write() ENTRY ========");
+        debug!(
+            "write: qpn={}, opcode={:?}, wr_id={}, send_flags=0x{:x}",
+            qpn,
+            wr.opcode(),
+            wr.wr_id(),
+            wr.send_flags()
+        );
+        debug!(
+            "write: laddr=0x{:x}, raddr=0x{:x}, length={}, lkey=0x{:x}, rkey=0x{:x}, imm={}",
+            wr.laddr().as_u64(),
+            wr.raddr().as_u64(),
+            wr.length(),
+            wr.lkey(),
+            wr.rkey(),
+            wr.imm()
+        );
+
+        debug!("write: looking up QP attr for qpn={}", qpn);
         let qp = self
             .qp_attr_table
             .get_qp(qpn)
             .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
 
         debug!(
-            "write called with sqpn={:?}, dqpn={:?}, wr={:?}",
-            qpn, qp.dqpn, wr
+            "write: QP attr found - qp_type={}, sqpn={}, dqpn={}, pmtu={}, mac_addr=0x{:x}",
+            qp.qp_type, qp.qpn, qp.dqpn, qp.pmtu, qp.mac_addr
+        );
+        debug!(
+            "write: QP attr - ip=0x{:x}, dqp_ip=0x{:x}, send_cq={:?}, recv_cq={:?}, access_flags={}",
+            qp.ip, qp.dqp_ip, qp.send_cq, qp.recv_cq, qp.access_flags
         );
 
         //TODO
         if wr.length() == 0 {
+            debug!("write: WARNING - wr.length() == 0, checking opcode");
             assert!(wr.opcode() != WorkReqOpCode::RdmaWrite);
         }
 
         let addr = wr.raddr();
         let length = wr.length();
+        debug!(
+            "write: calculating num_psn with pmtu={}, addr=0x{:x}, length={}",
+            qp.pmtu,
+            addr.as_u64(),
+            length
+        );
         let num_psn = num_psn(qp.pmtu, addr.as_u64(), length)
             .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
+        debug!("write: num_psn calculated = {}", num_psn);
+
+        debug!("write: getting next_wr from sq_ctx_table for qpn={}", qpn);
         let (msn, psn) = self
             .sq_ctx_table
             .get_qp_mut(qpn)
-            .and_then(|ctx| ctx.next_wr(num_psn))
+            .and_then(|ctx| {
+                debug!(
+                    "write: sq_ctx found - psn={:?}, msn={}, psn_acked={:?}, msn_acked={}",
+                    ctx.psn, ctx.msn, ctx.psn_acked, ctx.msn_acked
+                );
+                ctx.next_wr(num_psn)
+            })
             .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
         let end_psn = psn + num_psn;
+        debug!(
+            "write: msn={}, psn={:?}, end_psn={:?}, num_psn={}",
+            msn, psn, end_psn, num_psn
+        );
+
         let flags = wr.send_flags();
+        debug!(
+            "write: send_flags=0x{:x}, IBV_SEND_SIGNALED=0x{:x}",
+            flags,
+            ibverbs_sys::ibv_send_flags::IBV_SEND_SIGNALED.0
+        );
         let mut ack_req = false;
         if flags & ibverbs_sys::ibv_send_flags::IBV_SEND_SIGNALED.0 != 0 {
+            debug!("write: IBV_SEND_SIGNALED is set, setting up completion event");
             ack_req = true;
             let wr_id = wr.wr_id();
             let send_cq_handle = qp
                 .send_cq
                 .ok_or(io::Error::from(io::ErrorKind::InvalidInput))?;
+            debug!("write: wr_id={}, send_cq_handle={}", wr_id, send_cq_handle);
             #[allow(clippy::wildcard_enum_match_arm)]
             let op = match wr.opcode() {
                 WorkReqOpCode::RdmaWrite | WorkReqOpCode::RdmaWriteWithImm => {
+                    debug!("write: opcode is RdmaWrite/RdmaWriteWithImm -> WriteSignaled");
                     SendEventOp::WriteSignaled
                 }
-                WorkReqOpCode::Send | WorkReqOpCode::SendWithImm => SendEventOp::SendSignaled,
-                _ => return Err(io::ErrorKind::Unsupported.into()),
+                WorkReqOpCode::Send | WorkReqOpCode::SendWithImm => {
+                    debug!("write: opcode is Send/SendWithImm -> SendSignaled");
+                    SendEventOp::SendSignaled
+                }
+                _ => {
+                    debug!("write: ERROR - unsupported opcode {:?}", wr.opcode());
+                    return Err(io::ErrorKind::Unsupported.into());
+                }
             };
             let event = Event::Send(SendEvent::new(
                 qpn,
@@ -219,9 +277,17 @@ impl RdmaWriteWorker {
                 MessageMeta::new(msn, end_psn),
                 wr_id,
             ));
+            debug!(
+                "write: sending CompletionTask::Register qpn={}, msn={}, end_psn={:?}, wr_id={}",
+                qpn, msn, end_psn, wr_id
+            );
             self.completion_tx
                 .send(CompletionTask::Register { qpn, event });
+            debug!("write: CompletionTask sent successfully");
+        } else {
+            debug!("write: IBV_SEND_SIGNALED is NOT set, no completion event");
         }
+
         let qp_params = QpParams::new(
             msn,
             qp.qp_type,
@@ -231,8 +297,14 @@ impl RdmaWriteWorker {
             qp.dqp_ip,
             qp.pmtu,
         );
+        debug!(
+            "write: QpParams created - msn={}, qp_type={}, sqpn={}, dqpn={}, pmtu={}",
+            msn, qp.qp_type, qp.qpn, qp.dqpn, qp.pmtu
+        );
 
+        debug!("write: ack_req={}", ack_req);
         if ack_req {
+            debug!("write: sending AckTimeoutTask::new_ack_req for qpn={}", qpn);
             // TODO this code means what?
             // let fragmenter = WrPacketFragmenter::new(wr, qp_params, psn);
             // let Some(last_packet_chunk) = fragmenter.into_iter().last() else {
@@ -240,19 +312,44 @@ impl RdmaWriteWorker {
             //     return Ok(());
             // };
             self.timeout_tx.send(AckTimeoutTask::new_ack_req(qpn));
+            debug!("write: AckTimeoutTask sent successfully");
         }
 
+        debug!(
+            "write: sending PacketRetransmitTask::NewWr qpn={}, psn={:?}",
+            qpn, psn
+        );
         self.retransmit_tx.send(PacketRetransmitTask::NewWr {
             qpn,
             wr: SendQueueElem::new(wr, psn, qp_params),
         });
+        debug!("write: PacketRetransmitTask sent successfully");
 
+        debug!(
+            "write: creating WrChunkFragmenter with psn={:?}, starting fragmentation",
+            psn
+        );
         let fragmenter = WrChunkFragmenter::new(wr, qp_params, psn);
+        let mut chunk_count = 0;
         for chunk in fragmenter {
+            chunk_count += 1;
+            debug!(
+                "write: sending chunk #{}, psn={:?}, opcode={:?}, is_first={}, is_last={}, len={}",
+                chunk_count, chunk.psn, chunk.opcode, chunk.is_first, chunk.is_last, chunk.len
+            );
+            // if chunk.psn == Psn(0) {
+            //     log::warn!("delibrate loss psn 0 packet");
+            // } else {
+            //     self.send_handle.send(chunk);
+            // }
             self.send_handle.send(chunk);
         }
+        debug!(
+            "write: fragmentation complete, total chunks sent = {}",
+            chunk_count
+        );
 
-        debug!("RdmaWriteWorker handle write done");
+        debug!("======== write() EXIT - SUCCESS ========");
         Ok(())
     }
 }

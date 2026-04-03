@@ -28,6 +28,11 @@ impl SendHandle {
     }
 
     pub(crate) fn send(&self, wr: WrChunk) {
+        log::debug!(
+            "SendHandle: sending a WrChunk with opcode {:?} and len {}",
+            wr.opcode,
+            wr.total_len
+        );
         self.injector.push(wr);
     }
 }

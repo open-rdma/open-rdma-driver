@@ -6,9 +6,7 @@ use crate::{
     cmd::{CommandConfigurator, MttUpdate, PgtUpdate, RecvBufferMeta, UpdateQp},
     config::DeviceConfig,
     constants::CARD_MAC_ADDRESS,
-    mem::{
-        get_num_page, AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE,
-    },
+    mem::{get_num_page, AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE},
     net::{
         config::NetworkConfig,
         reader::NetConfigReader,
@@ -546,6 +544,7 @@ where
                     rq_access_flags,
                     pmtu: attr.path_mtu().map_or(current.pmtu, |x| x as u8),
                 };
+                log::debug!("[TEST] update_qp qpn is: {qpn},attr.path_mtu() is: {:?},current.pmtu is: {:?}, update_qp generated entry: {entry:?}", attr.path_mtu(), current.pmtu);
                 current.dqpn = entry.peer_qpn;
                 current.access_flags = rq_access_flags;
                 current.pmtu = entry.pmtu;
@@ -646,7 +645,7 @@ where
         }
 
         debug!(
-            "QP {}: Buffered operation to pending queue (pending count: {})",
+            "QP {}: Buffered operation to pending queue first (pending count: {})",
             qpn,
             self.pending_send_queue_table.len(qpn)
         );

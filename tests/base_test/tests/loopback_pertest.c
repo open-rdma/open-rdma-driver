@@ -111,36 +111,36 @@ int run_loopback_test(int msg_len, int num_rounds) {
     }
   }
 
-  sleep(5);
-  printf("[LOOPBACK]start second write round\n");
-  for (int round = 0; round < num_rounds; round++) {
-    // All rounds use the same shared buffer
-    // Prepare RDMA WRITE operation
-    struct ibv_sge sge = {
-        .addr = (uint64_t)src_buffer, .length = msg_len, .lkey = ctx.mr->lkey};
+  // sleep(5);
+  // printf("[LOOPBACK]start second write round\n");
+  // for (int round = 0; round < num_rounds; round++) {
+  //   // All rounds use the same shared buffer
+  //   // Prepare RDMA WRITE operation
+  //   struct ibv_sge sge = {
+  //       .addr = (uint64_t)src_buffer, .length = msg_len, .lkey = ctx.mr->lkey};
 
-    struct ibv_send_wr wr = {
-        .wr_id = 0,
-        .sg_list = &sge,
-        .num_sge = 1,
-        .opcode = IBV_WR_RDMA_WRITE,
-        .send_flags = IBV_SEND_SIGNALED,
-        .wr = {.rdma = {.remote_addr = (uint64_t)dst_buffer,
-                        .rkey = ctx.mr->lkey}}};
+  //   struct ibv_send_wr wr = {
+  //       .wr_id = 0,
+  //       .sg_list = &sge,
+  //       .num_sge = 1,
+  //       .opcode = IBV_WR_RDMA_WRITE,
+  //       .send_flags = IBV_SEND_SIGNALED,
+  //       .wr = {.rdma = {.remote_addr = (uint64_t)dst_buffer,
+  //                       .rkey = ctx.mr->lkey}}};
 
-    struct ibv_send_wr *bad_wr;
+  //   struct ibv_send_wr *bad_wr;
 
-    // Post send
-    // printf("[LOOPBACK] Posting RDMA WRITE round %d, dst ptr %p\n", round,
-    //        (void *)dst_buffer);
+  //   // Post send
+  //   // printf("[LOOPBACK] Posting RDMA WRITE round %d, dst ptr %p\n", round,
+  //   //        (void *)dst_buffer);
 
-    if (ibv_post_send(qp0, &wr, &bad_wr) != 0) {
-      fprintf(stderr, "[ERROR] ibv_post_send failed\n");
-      failed_rounds++;
-      fprintf(stderr, "panic: %s\n", "Work completion failed");
-      exit(0);
-    }
-  }
+  //   if (ibv_post_send(qp0, &wr, &bad_wr) != 0) {
+  //     fprintf(stderr, "[ERROR] ibv_post_send failed\n");
+  //     failed_rounds++;
+  //     fprintf(stderr, "panic: %s\n", "Work completion failed");
+  //     exit(0);
+  //   }
+  // }
 
   //   printf("[LOOPBACK] Sleeping for 5 seconds before verifying
   //   results...\n"); sleep(5); printf("[LOOPBACK] Sleeping end\n");

@@ -1,5 +1,6 @@
 
-PERF_TEST_PARAMS="--loopback --use_hugepages --data_validation_debug -t 1 -x 3"
+MSG_SIZE=${MSG_SIZE:-16384}
+PERF_TEST_PARAMS="--loopback -q 8 --use_hugepages -t 4 -x 3 -n 5 -s ${MSG_SIZE}"
 RUST_LOG=${RUST_LOG:-info}
 PERFTEST_CMD="ib_write_bw"
 

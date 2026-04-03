@@ -249,7 +249,7 @@ where
 
     pub(crate) fn try_push_atomic(&mut self, elements: &[Spec::Element]) -> io::Result<bool> {
         let avai = self.available()?;
-        log::debug!("[available] try_push_atomic: available={}", avai);
+        log::info!("[available] try_push_atomic: available={}", avai);
         if (self.available()? as usize) < elements.len() {
             self.sync_tail()?;
             if (self.available()? as usize) < elements.len() {

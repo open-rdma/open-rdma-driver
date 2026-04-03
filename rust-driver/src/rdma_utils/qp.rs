@@ -46,12 +46,23 @@ impl QpManager {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub(crate) struct SendQueueContext {
     pub(crate) msn: u16,
     pub(crate) psn: Psn,
     pub(crate) psn_acked: Psn,
     pub(crate) msn_acked: u16,
+}
+
+impl Default for SendQueueContext {
+    fn default() -> Self {
+        Self {
+            msn: 0,      // 自定义值
+            psn: Psn(0), // 自定义值
+            psn_acked: Psn::default(),
+            msn_acked: 0,
+        }
+    }
 }
 
 impl SendQueueContext {

@@ -84,6 +84,7 @@ impl MetaHandler {
     }
 
     pub(super) fn handle_meta(&mut self, meta: ReportMeta) -> Option<()> {
+        log::info!("MetaHandler got meta = {:?}", meta);
         self.update_ack_timer(&meta);
         match meta {
             ReportMeta::HeaderWrite(x) => self.handle_header_write(x),
@@ -147,31 +148,31 @@ impl MetaHandler {
             self.sender_updates(meta.qpn, psn);
         }
 
-        self.packet_retransmit_tx
-            .send(PacketRetransmitTask::RetransmitRange {
-                qpn: meta.qpn,
-                psn_low: meta.psn_pre,
-                psn_high: meta.psn_now + 128,
-            });
+        // self.packet_retransmit_tx
+        //     .send(PacketRetransmitTask::RetransmitRange {
+        //         qpn: meta.qpn,
+        //         psn_low: meta.psn_pre,
+        //         psn_high: meta.psn_now + 128,
+        //     });
 
         Some(())
     }
 
     #[allow(clippy::unnecessary_wraps)]
     fn handle_nak_remote_driver(&mut self, meta: NakMetaRemoteDriver) -> Option<()> {
-        debug!("nak remote driver: {meta:?}");
+        log::warn!("nak remote driver: {meta:?}");
 
         let tracker = self.send_table.get_qp_mut(meta.qpn)?;
         if let Some(psn) = tracker.ack_before(meta.psn_pre) {
             self.sender_updates(meta.qpn, psn);
         }
 
-        self.packet_retransmit_tx
-            .send(PacketRetransmitTask::RetransmitRange {
-                qpn: meta.qpn,
-                psn_low: meta.psn_pre,
-                psn_high: meta.psn_now,
-            });
+        // self.packet_retransmit_tx
+        //     .send(PacketRetransmitTask::RetransmitRange {
+        //         qpn: meta.qpn,
+        //         psn_low: meta.psn_pre,
+        //         psn_high: meta.psn_now,
+        //     });
 
         Some(())
     }
@@ -197,8 +198,8 @@ impl MetaHandler {
         self.completion_tx
             .send(CompletionTask::AckRecv { qpn, base_psn });
         // FIXME TODO 这对吗？为什么recv也要负责tx重传？
-        self.packet_retransmit_tx
-            .send(PacketRetransmitTask::Ack { qpn, psn: base_psn });
+        // self.packet_retransmit_tx
+        //     .send(PacketRetransmitTask::Ack { qpn, psn: base_psn });
     }
 
     pub(super) fn handle_header_read(&mut self, meta: HeaderReadMeta) -> Option<()> {
