@@ -84,6 +84,7 @@ impl MetaHandler {
     }
 
     pub(super) fn handle_meta(&mut self, meta: ReportMeta) -> Option<()> {
+        // log::info!("MetaHandler handle_meta got meta = {:?}", meta);
         self.update_ack_timer(&meta);
         match meta {
             ReportMeta::HeaderWrite(x) => self.handle_header_write(x),
@@ -103,6 +104,7 @@ impl MetaHandler {
     }
 
     fn handle_ack_local_hw(&mut self, meta: AckMetaLocalHw) -> Option<()> {
+        log::debug!("handle_ack_local_hw: {meta:?}");
         let tracker = self.recv_table.get_qp_mut(meta.qpn)?;
         if let Some(psn) = tracker.ack_bitmap(meta.psn_now, meta.now_bitmap) {
             self.receiver_updates(meta.qpn, psn);
@@ -112,6 +114,7 @@ impl MetaHandler {
     }
 
     fn handle_ack_remote_driver(&mut self, meta: AckMetaRemoteDriver) -> Option<()> {
+        // log::debug!("handle_ack_remote_driver: {meta:?}");
         let tracker = self.send_table.get_qp_mut(meta.qpn)?;
         if let Some(psn) = tracker.ack_before(meta.psn_now) {
             self.sender_updates(meta.qpn, psn);
@@ -121,7 +124,7 @@ impl MetaHandler {
     }
 
     fn handle_nak_local_hw(&mut self, meta: NakMetaLocalHw) -> Option<()> {
-        debug!("nak local hw: {meta:?}");
+        log::info!("handle_nak_local_hw: {meta:?}");
 
         let tracker = self.recv_table.get_qp_mut(meta.qpn)?;
         if let Some(psn) =
@@ -134,7 +137,7 @@ impl MetaHandler {
     }
 
     fn handle_nak_remote_hw(&mut self, meta: NakMetaRemoteHw) -> Option<()> {
-        debug!("nak remote hw: {meta:?}");
+        log::info!("handle_nak_remote_hw: {meta:?}");
 
         let tracker = self.send_table.get_qp_mut(meta.qpn)?;
         if let Some(psn) = tracker.nak_bitmap(
@@ -147,12 +150,12 @@ impl MetaHandler {
             self.sender_updates(meta.qpn, psn);
         }
 
-        self.packet_retransmit_tx
-            .send(PacketRetransmitTask::RetransmitRange {
-                qpn: meta.qpn,
-                psn_low: meta.psn_pre,
-                psn_high: meta.psn_now + 128,
-            });
+        // self.packet_retransmit_tx
+        //     .send(PacketRetransmitTask::RetransmitRange {
+        //         qpn: meta.qpn,
+        //         psn_low: meta.psn_pre,
+        //         psn_high: meta.psn_now + 128,
+        //     });
 
         Some(())
     }
@@ -166,21 +169,22 @@ impl MetaHandler {
             self.sender_updates(meta.qpn, psn);
         }
 
-        self.packet_retransmit_tx
-            .send(PacketRetransmitTask::RetransmitRange {
-                qpn: meta.qpn,
-                psn_low: meta.psn_pre,
-                psn_high: meta.psn_now,
-            });
+        // self.packet_retransmit_tx
+        //     .send(PacketRetransmitTask::RetransmitRange {
+        //         qpn: meta.qpn,
+        //         psn_low: meta.psn_pre,
+        //         psn_high: meta.psn_now,
+        //     });
 
         Some(())
     }
 
     pub(crate) fn sender_updates(&self, qpn: u32, base_psn: Psn) {
-        debug!(
-            "MetaHandler sender_updates qpn={:?}, base_psn={:?}",
-            qpn, base_psn
-        );
+        // log::info!(
+        //     "MetaHandler sender_updates qpn={:?}, base_psn={:?}",
+        //     qpn,
+        //     base_psn
+        // );
         self.completion_tx
             .send(CompletionTask::AckSend { qpn, base_psn });
         self.packet_retransmit_tx
@@ -196,9 +200,9 @@ impl MetaHandler {
         );
         self.completion_tx
             .send(CompletionTask::AckRecv { qpn, base_psn });
-        // FIXME TODO 这对吗？为什么recv也要负责tx重传？
-        self.packet_retransmit_tx
-            .send(PacketRetransmitTask::Ack { qpn, psn: base_psn });
+        // // FIXME TODO 这对吗？为什么recv也要负责tx重传？
+        // self.packet_retransmit_tx
+        //     .send(PacketRetransmitTask::Ack { qpn, psn: base_psn });
     }
 
     pub(super) fn handle_header_read(&mut self, meta: HeaderReadMeta) -> Option<()> {
