@@ -74,6 +74,8 @@ impl SingleThreadTaskWorker for PacketRetransmitWorker {
                     .take_while(|x| x.psn < psn_high);
                 for mut packet in packets {
                     packet.set_is_retry();
+                    log::info!("send RetransmitRange");
+
                     self.wr_sender.send(packet);
                 }
             }
@@ -87,6 +89,7 @@ impl SingleThreadTaskWorker for PacketRetransmitWorker {
                     .skip_while(|x| x.psn < sq.base_psn);
                 for mut packet in packets {
                     packet.set_is_retry();
+                    log::info!("send RetransmitAll");
                     self.wr_sender.send(packet);
                 }
             }
@@ -169,10 +172,7 @@ impl SendQueueElem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        rdma_utils::types::SendWrBase,
-        workers::send::QpParams,
-    };
+    use crate::{rdma_utils::types::SendWrBase, workers::send::QpParams};
     use std::sync::{Arc, Mutex};
 
     // Mock SendHandle for testing

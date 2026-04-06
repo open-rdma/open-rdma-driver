@@ -27,7 +27,7 @@ build_rust_driver "hw" "release"
 
 
 # 运行 loopback 测试，参数是消息长度
-MSG_LEN=${1:-209600}  # 默认 4096 字节
+MSG_LEN=${1:-65536}  # 默认 4096 字节
 ROUND=${2:-10}  # 默认 10 轮
 RUST_LOG=${RUST_LOG:-info}  # 默认 info 级别日志
 
@@ -42,8 +42,14 @@ sudo setpci  -s 01:00.0 98.b=0x16
 sudo setpci  -s 01:00.0 CAP_EXP+28.w=0x1000
 
 
-MSG_SIZE=${MSG_SIZE:-65536}
-PERF_TEST_PARAMS="--loopback --use_hugepages -t 32 -x 3 -s ${MSG_SIZE}"
+# MSG_SIZE=${MSG_SIZE:-8192}
+# PERF_TEST_PARAMS="--loopback -q 32 -m 256 --use_hugepages -n 5000 -t 4 -x 3 -s ${MSG_SIZE}"
+
+MSG_SIZE=${MSG_SIZE:-524288}
+PERF_TEST_PARAMS="--loopback -q 60 --use_hugepages -n 50 -t 1 -x 3 -s ${MSG_SIZE}"
+
+# MSG_SIZE=${MSG_SIZE:-131072}
+# PERF_TEST_PARAMS="--loopback -q 15 --use_hugepages -n 50 -t 4 -x 3 -s ${MSG_SIZE}"
 
 sudo env \
 	RUST_LOG=${RUST_LOG} \

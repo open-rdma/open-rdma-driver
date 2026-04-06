@@ -43,7 +43,7 @@
 //! adaptor.write_csr(0x2000, 0x42)?;
 //! ```
 
-use log::debug;
+use log::{debug, trace};
 use memmap2::{MmapMut, MmapOptions};
 use parking_lot::Mutex;
 use pci_driver::{
@@ -126,9 +126,11 @@ impl DeviceAdaptor for SysfsPciCsrAdaptor {
         unsafe {
             let ptr = bar.as_ptr().add(addr);
             let ret = ptr.cast::<u32>().read_volatile();
-            debug!(
+            trace!(
                 "read csr: addr=0x{:x}, bar_offset=0x{:x}, val=0x{:x}",
-                ptr as usize, addr, ret
+                ptr as usize,
+                addr,
+                ret
             );
             Ok(ret)
         }
@@ -145,9 +147,11 @@ impl DeviceAdaptor for SysfsPciCsrAdaptor {
         let mut bar = self.bar.lock();
         unsafe {
             let ptr = bar.as_mut_ptr().add(addr);
-            debug!(
+            trace!(
                 "write csr: addr=0x{:x}, bar_offset=0x{:x}, val=0x{:x}",
-                ptr as usize, addr, data
+                ptr as usize,
+                addr,
+                data
             );
             ptr.cast::<u32>().write_volatile(data);
         }

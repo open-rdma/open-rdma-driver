@@ -248,8 +248,37 @@ where
     // }
 
     pub(crate) fn try_push_atomic(&mut self, elements: &[Spec::Element]) -> io::Result<bool> {
+        // std::thread::sleep(std::time::Duration::from_nanos(1000));
+
         let avai = self.available()?;
-        log::debug!("[available] try_push_atomic: available={}", avai);
+        // self.sync_tail()?;
+        // if avai < 1000 {
+        //     log::warn!(
+        //         "try_push_atomic near overflow: available={}, hw_head is {}, tail is {}",
+        //         avai,
+        //         self.cached_head,
+        //         self.cached_hw_tail
+        //     );
+        // }
+
+        // use std::sync::atomic::{AtomicU64, Ordering};
+        // use std::time::{SystemTime, UNIX_EPOCH};
+        // {
+        //     static LAST_LOG_SECS: AtomicU64 = AtomicU64::new(0);
+        //     let now_secs = SystemTime::now()
+        //         .duration_since(UNIX_EPOCH)
+        //         .unwrap_or_default()
+        //         .as_secs();
+        //     let last = LAST_LOG_SECS.load(Ordering::Relaxed);
+        //     if now_secs > last
+        //         && LAST_LOG_SECS
+        //             .compare_exchange(last, now_secs, Ordering::Relaxed, Ordering::Relaxed)
+        //             .is_ok()
+        //     {
+        //         log::debug!("[available] try_push_atomic: available={}", avai);
+        //     }
+        // }
+
         if (self.available()? as usize) < elements.len() {
             self.sync_tail()?;
             if (self.available()? as usize) < elements.len() {
@@ -287,6 +316,7 @@ where
     pub(crate) fn sync_tail(&mut self) -> io::Result<()> {
         log::trace!("sync_tail");
         let hw_tail = self.csr_ring.read_tail()?;
+        log::info!("sync_tail: hw_tail={}", hw_tail);
         self.cached_hw_tail = hw_tail;
         Ok(())
     }

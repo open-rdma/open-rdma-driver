@@ -121,7 +121,7 @@ impl<Dev: DeviceAdaptor> FrameTxQueue<Dev> {
 
 impl<Dev: DeviceAdaptor + Send + 'static> FrameTx for FrameTxQueue<Dev> {
     fn send(&mut self, buf: &[u8]) -> io::Result<()> {
-        log::info!("Sending frame of size {} bytes", buf.len());
+        log::debug!("Sending frame of size {} bytes", buf.len());
 
         let desc = self
             .build_desc(buf)

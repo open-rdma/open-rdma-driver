@@ -6,9 +6,7 @@ use crate::{
     cmd::{CommandConfigurator, MttUpdate, PgtUpdate, RecvBufferMeta, UpdateQp},
     config::DeviceConfig,
     constants::CARD_MAC_ADDRESS,
-    mem::{
-        get_num_page, AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE,
-    },
+    mem::{get_num_page, AddressResolver, DmaBuf, DmaBufAllocator, UmemHandler, PAGE_SIZE},
     net::{
         config::NetworkConfig,
         reader::NetConfigReader,
