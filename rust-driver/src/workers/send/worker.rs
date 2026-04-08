@@ -28,6 +28,7 @@ impl SendHandle {
     }
 
     pub(crate) fn send(&self, wr: WrChunk) {
+        // log::info!("SendHandle sending wr: {:?}", wr);
         self.injector.push(wr);
     }
 }

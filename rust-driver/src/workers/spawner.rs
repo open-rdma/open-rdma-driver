@@ -48,6 +48,47 @@ pub(crate) trait SingleThreadTaskWorker {
 
     fn maintainance(&mut self);
 
+    fn has_pending_work(&self) -> bool {
+        false
+    }
+
+    fn spawn_roundrobin(mut self, rx: TaskRx<Self::Task>, name: &str, abort: AbortSignal)
+    where
+        Self: Sized + Send + 'static,
+        Self::Task: Send + 'static,
+    {
+        let name = name.to_owned();
+        let abort = AbortSignal::new();
+        let _handle = std::thread::Builder::new()
+            .name(name.clone())
+            .spawn(move || {
+                info!("worker {name} running");
+                loop {
+                    if abort.should_abort() {
+                        break;
+                    }
+                    // Between rounds: pick up any newly arrived WQEs
+                    while let Some(task) = rx.try_recv() {
+                        self.process(task);
+                    }
+                    if self.has_pending_work() {
+                        // One round: send one chunk per pending WQE
+                        self.maintainance();
+                    } else {
+                        // No pending work — block until the next WQE arrives
+                        if let Some(task) = rx.recv() {
+                            self.process(task);
+                        } else {
+                            error!("failed to recv task from channel");
+                            break;
+                        }
+                    }
+                }
+                info!("worker {name} exited");
+            })
+            .expect("failed to spawn worker");
+    }
+
     fn spawn(mut self, rx: TaskRx<Self::Task>, name: &str, abort: AbortSignal)
     where
         Self: Sized + Send + 'static,

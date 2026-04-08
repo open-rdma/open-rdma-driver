@@ -166,7 +166,7 @@ where
             packet_retransmit_tx.clone(),
             completion_tx.clone(),
         )
-        .spawn(rdma_write_rx, "RdmaWriteWorker", abort.clone());
+        .spawn_roundrobin(rdma_write_rx, "RdmaWriteWorker", abort.clone());
 
         CompletionWorker::new(
             cq_table.clone_arc(),

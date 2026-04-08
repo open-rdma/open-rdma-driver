@@ -1,10 +1,10 @@
-use std::io;
+use std::{collections::VecDeque, io};
 
 use log::debug;
 
 use crate::{
     rdma_utils::{
-        fragmenter::WrChunkFragmenter,
+        fragmenter::{IntoIterChunk, WrChunkFragmenter},
         psn::Psn,
         qp::{num_psn, QpTable, QpTableShared, SendQueueContext},
         types::{QpAttr, SendWrRdma},
@@ -46,6 +46,7 @@ pub(crate) struct RdmaWriteWorker {
     timeout_tx: TaskTx<AckTimeoutTask>,
     retransmit_tx: TaskTx<PacketRetransmitTask>,
     completion_tx: TaskTx<CompletionTask>,
+    pending_fragmenters: VecDeque<IntoIterChunk>,
 }
 
 impl SingleThreadTaskWorker for RdmaWriteWorker {
@@ -76,7 +77,31 @@ impl SingleThreadTaskWorker for RdmaWriteWorker {
         }
     }
 
-    fn maintainance(&mut self) {}
+    fn maintainance(&mut self) {
+        // static LAST_LOG_TIME: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        // if self.pending_fragmenters.len() <= 1 {
+        //     log::info!(
+        //         "RdmaWriteWorker has {} pending fragmenters",
+        //         self.pending_fragmenters.len()
+        //     );
+        //     // std::thread::sleep(std::time::Duration::from_nanos(10000));
+        // }
+
+        let count = self.pending_fragmenters.len();
+        for _ in 0..count {
+            if let Some(mut iter) = self.pending_fragmenters.pop_front() {
+                if let Some(chunk) = iter.next() {
+                    self.send_handle.send(chunk);
+                    self.pending_fragmenters.push_back(iter);
+                }
+                // exhausted fragmenter is dropped
+            }
+        }
+    }
+
+    fn has_pending_work(&self) -> bool {
+        !self.pending_fragmenters.is_empty()
+    }
 }
 
 impl RdmaWriteWorker {
@@ -94,6 +119,7 @@ impl RdmaWriteWorker {
             timeout_tx,
             retransmit_tx,
             completion_tx,
+            pending_fragmenters: VecDeque::new(),
         }
     }
 
@@ -247,11 +273,8 @@ impl RdmaWriteWorker {
             wr: SendQueueElem::new(wr, psn, qp_params),
         });
 
-        let fragmenter = WrChunkFragmenter::new(wr, qp_params, psn);
-        for chunk in fragmenter {
-            log::debug!("RdmaWriteWorker sending chunk: {:?}", chunk);
-            self.send_handle.send(chunk);
-        }
+        let iter = WrChunkFragmenter::new(wr, qp_params, psn).into_iter();
+        self.pending_fragmenters.push_back(iter);
 
         debug!("RdmaWriteWorker handle write done");
         Ok(())
