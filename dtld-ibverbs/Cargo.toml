@@ -22,3 +22,6 @@ blue-rdma-driver = { path = "../rust-driver", version = "0.1.0", default-feature
 
 # FFI bindings, may replaced with bindgen in the future
 ffi = { package = "ibverbs-sys", git = "https://github.com/bsbds/rust-ibverbs.git", rev = "ea06bdc" }
+
+[profile.release]
+debug = 1

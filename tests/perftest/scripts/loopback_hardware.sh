@@ -48,7 +48,7 @@ sudo setpci  -s 01:00.0 CAP_EXP+28.w=0x1000
 MSG_SIZE=${MSG_SIZE:-524288}
 PERF_TEST_PARAMS="--loopback -q 60 --use_hugepages -n 50 -t 1 -x 3 -s ${MSG_SIZE}"
 
-# MSG_SIZE=${MSG_SIZE:-131072}
+# MSG_SIZE=${MSG_SIZE:-1048576}
 # PERF_TEST_PARAMS="--loopback -q 15 --use_hugepages -n 50 -t 4 -x 3 -s ${MSG_SIZE}"
 
 sudo env \
