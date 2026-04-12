@@ -60,7 +60,7 @@
 use super::csr::{
     constants::{
         CMD_REQ_RING_BASE, CMD_RESP_RING_BASE, QP_RECV_RING_BASES, QP_SEND_RING_BASES,
-        SIMPLE_NIC_RX_RING_BASE, SIMPLE_NIC_TX_RING_BASE,
+        RING_BUF_LEN_BITS, SIMPLE_NIC_RX_RING_BASE, SIMPLE_NIC_TX_RING_BASE,
     },
     mode::Mode,
     ring_csr::RingCsr,
@@ -75,63 +75,69 @@ use crate::ring::{
 
 pub(crate) struct CmdReqSpec;
 impl RingSpec for CmdReqSpec {
+    const ELEMENT_NUM_EXP: u8 = RING_BUF_LEN_BITS;
+    type Element = CmdQueueDesc;
+
     fn csr_base(&self) -> usize {
         CMD_REQ_RING_BASE
     }
 }
-impl RingSpecToCard for CmdReqSpec {
-    type Element = CmdQueueDesc;
-}
+impl RingSpecToCard for CmdReqSpec {}
 
 pub(crate) struct CmdRespSpec;
 impl RingSpec for CmdRespSpec {
+    const ELEMENT_NUM_EXP: u8 = RING_BUF_LEN_BITS;
+    type Element = CmdRespQueueDesc;
+
     fn csr_base(&self) -> usize {
         CMD_RESP_RING_BASE
     }
 }
-impl RingSpecToHost for CmdRespSpec {
-    type Element = CmdRespQueueDesc;
-}
+impl RingSpecToHost for CmdRespSpec {}
 
 pub(crate) struct SimpleNicTxSpec;
 impl RingSpec for SimpleNicTxSpec {
+    const ELEMENT_NUM_EXP: u8 = RING_BUF_LEN_BITS;
+    type Element = SimpleNicTxQueueDesc;
+
     fn csr_base(&self) -> usize {
         SIMPLE_NIC_TX_RING_BASE
     }
 }
-impl RingSpecToCard for SimpleNicTxSpec {
-    type Element = SimpleNicTxQueueDesc;
-}
+impl RingSpecToCard for SimpleNicTxSpec {}
 
 pub(crate) struct SimpleNicRxSpec;
 impl RingSpec for SimpleNicRxSpec {
+    const ELEMENT_NUM_EXP: u8 = RING_BUF_LEN_BITS;
+    type Element = SimpleNicRxQueueDesc;
+
     fn csr_base(&self) -> usize {
         SIMPLE_NIC_RX_RING_BASE
     }
 }
-impl RingSpecToHost for SimpleNicRxSpec {
-    type Element = SimpleNicRxQueueDesc;
-}
+impl RingSpecToHost for SimpleNicRxSpec {}
 
 pub(crate) struct SendRingSpec(pub(crate) usize);
 impl RingSpec for SendRingSpec {
+    const ELEMENT_NUM_EXP: u8 = RING_BUF_LEN_BITS;
+    type Element = SendQueueDesc;
+
     fn csr_base(&self) -> usize {
         QP_SEND_RING_BASES[self.0]
     }
 }
-impl RingSpecToCard for SendRingSpec {
-    type Element = SendQueueDesc;
-}
+impl RingSpecToCard for SendRingSpec {}
 
 pub(crate) struct MetaReportRingSpec(pub(crate) usize);
 impl RingSpec for MetaReportRingSpec {
+    const ELEMENT_NUM_EXP: u8 = RING_BUF_LEN_BITS;
+    type Element = MetaReportQueueDesc;
+
     fn csr_base(&self) -> usize {
         QP_RECV_RING_BASES[self.0]
     }
 }
-impl RingSpecToHost for MetaReportRingSpec {
-    type Element = MetaReportQueueDesc;
-}
+impl RingSpecToHost for MetaReportRingSpec {}
 
 // ============================================================================
 // Public type aliases

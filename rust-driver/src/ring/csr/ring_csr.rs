@@ -56,7 +56,9 @@ use super::constants::{
     RING_OFFSET_BASE_HIGH, RING_OFFSET_BASE_LOW, RING_OFFSET_HEAD, RING_OFFSET_TAIL,
 };
 
-use crate::ring::traits::{DeviceAdaptor, RingSpec, RingSpecToCard, RingSpecToHost};
+use crate::ring::traits::{
+    DeviceAdaptor, FromRingBytes, RingSpec, RingSpecToCard, RingSpecToHost, ToRingBytes,
+};
 
 pub(crate) struct RingCsr<Dev, Spec>
 where
@@ -113,7 +115,12 @@ pub(crate) trait ReaderOps {
 }
 
 /// Implement writer operations for ToCard rings (host produces, card consumes)
-impl<Dev: DeviceAdaptor, Spec: RingSpecToCard> WriterOps for RingCsr<Dev, Spec> {
+impl<Dev, Spec> WriterOps for RingCsr<Dev, Spec>
+where
+    Dev: DeviceAdaptor,
+    Spec: RingSpecToCard,
+    <Spec as RingSpec>::Element: ToRingBytes,
+{
     #[inline]
     fn write_head(&self, head: u32) -> io::Result<()> {
         self.dev
@@ -127,7 +134,12 @@ impl<Dev: DeviceAdaptor, Spec: RingSpecToCard> WriterOps for RingCsr<Dev, Spec> 
 }
 
 /// Implement reader operations for ToHost rings (card produces, host consumes)
-impl<Dev: DeviceAdaptor, Spec: RingSpecToHost> ReaderOps for RingCsr<Dev, Spec> {
+impl<Dev, Spec> ReaderOps for RingCsr<Dev, Spec>
+where
+    Dev: DeviceAdaptor,
+    Spec: RingSpecToHost,
+    <Spec as RingSpec>::Element: FromRingBytes,
+{
     #[inline]
     fn read_head(&self) -> io::Result<u32> {
         self.dev.read_csr(self.spec.csr_base() + RING_OFFSET_HEAD)

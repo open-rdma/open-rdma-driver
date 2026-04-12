@@ -5,7 +5,4 @@
 
 pub(crate) mod addr;
 
-pub(crate) use addr::{
-    PageAlignedPhysAddr, PageAlignedVirtAddr, PhysAddr, RemoteAddr,
-    VirtAddr,
-};
+pub(crate) use addr::{PageAlignedPhysAddr, PageAlignedVirtAddr, PhysAddr, RemoteAddr, VirtAddr};

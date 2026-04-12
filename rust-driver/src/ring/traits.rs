@@ -9,19 +9,43 @@ pub(crate) trait DeviceAdaptor: Clone {
 
 /// Compile-time description of a ring.
 pub(crate) trait RingSpec {
+    const ELEMENT_NUM_EXP: u8;
+
+    const ELEMENT_NUM: u32 = 1 << Self::ELEMENT_NUM_EXP;
+
+    #[inline]
+    fn element_num() -> u32 {
+        Self::ELEMENT_NUM
+    }
+
+    #[inline]
+    fn element_num_usize() -> usize {
+        Self::ELEMENT_NUM as usize
+    }
+
     fn csr_base(&self) -> usize;
+
+    type Element: Sized;
 }
 
-/// Ring specification for Device → Host rings (card produces, host consumes)
-pub(crate) trait RingSpecToHost: RingSpec {
-    /// The element type this ring produces (from device perspective)
-    type Element: FromRingBytes;
+/// Marker trait for Device → Host rings (card produces, host consumes)
+///
+/// This trait is automatically implemented for all `RingSpec` types whose
+/// `Element` implements `FromRingBytes`.
+pub(crate) trait RingSpecToHost: RingSpec
+where
+    <Self as RingSpec>::Element: FromRingBytes,
+{
 }
 
-/// Ring specification for Host → Device rings (host produces, card consumes)
-pub(crate) trait RingSpecToCard: RingSpec {
-    /// The element type this ring consumes (from device perspective)
-    type Element: ToRingBytes;
+/// Marker trait for Host → Device rings (host produces, card consumes)
+///
+/// This trait is automatically implemented for all `RingSpec` types whose
+/// `Element` implements `ToRingBytes`.
+pub(crate) trait RingSpecToCard: RingSpec
+where
+    <Self as RingSpec>::Element: ToRingBytes,
+{
 }
 
 // ============================================================================

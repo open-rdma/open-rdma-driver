@@ -11,10 +11,7 @@ use std::{
 use default_net::Interface;
 use ipnetwork::Ipv4Network;
 
-use crate::{
-    constants::BLUE_RDMA_SYSFS_PATH,
-    net::config::NetworkConfig,
-};
+use crate::{constants::BLUE_RDMA_SYSFS_PATH, net::config::NetworkConfig};
 
 use super::config::MacAddress;
 

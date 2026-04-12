@@ -48,7 +48,7 @@ where
 
     let ctxs = pages
         .into_iter()
-        .map(|p| DmaBuffer::new(p))
+        .map(DmaBuffer::new_for_spec::<crate::ring::spec::MetaReportRingSpec>)
         .zip(mrq_rings)
         .map(|(q, ring)| ConsumerRingDefault::new(q, ring).unwrap())
         .collect();

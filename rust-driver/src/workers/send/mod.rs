@@ -1,8 +1,5 @@
 use std::{io, iter, sync::Arc};
 
-use types::{WrInjector, WrWorker};
-use worker::SendWorker;
-
 use crate::{
     mem::DmaBuf,
     ring::{
@@ -13,6 +10,8 @@ use crate::{
     },
     workers::spawner::{AbortSignal, SingleThreadPollingWorker},
 };
+use types::{WrInjector, WrWorker};
+use worker::SendWorker;
 
 mod types;
 mod worker;
@@ -35,7 +34,7 @@ where
 
     let producer_rings = bufs
         .into_iter()
-        .map(|p| DmaBuffer::new(p))
+        .map(DmaBuffer::new_for_spec::<crate::ring::spec::SendRingSpec>)
         .zip(sq_rings)
         .map(|(q, ring)| ProducerRingDefault::new(q, ring).unwrap());
 

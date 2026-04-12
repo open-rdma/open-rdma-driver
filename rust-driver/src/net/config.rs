@@ -1,10 +1,6 @@
 #![allow(clippy::module_name_repetitions)] // exported
 
-use std::{
-    io,
-    net::Ipv4Addr,
-    str::FromStr,
-};
+use std::{io, net::Ipv4Addr, str::FromStr};
 
 use ipnetwork::Ipv4Network;
 use serde::{Deserialize, Serialize};

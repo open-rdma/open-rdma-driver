@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     constants::{
-        DEFAULT_INIT_RETRY_COUNT, DEFAULT_LOCAL_ACK_TIMEOUT, DEFAULT_TIMEOUT_CHECK_DURATION, QPN_KEY_PART_WIDTH,
+        DEFAULT_INIT_RETRY_COUNT, DEFAULT_LOCAL_ACK_TIMEOUT, DEFAULT_TIMEOUT_CHECK_DURATION,
+        QPN_KEY_PART_WIDTH,
     },
     rdma_utils::qp::QpTable,
     workers::{

@@ -37,8 +37,14 @@ impl<Dev: DeviceAdaptor> CommandConfigurator<Dev> {
     pub(crate) fn init(dev: &Dev, req_buf: DmaBuf, resp_buf: DmaBuf) -> io::Result<Self> {
         let req_csr_ring = cmd_req_ring(dev.clone());
         let resp_csr_ring = cmd_resp_ring(dev.clone());
-        let tx_ring = ProducerRingDefault::new(DmaBuffer::new(req_buf), req_csr_ring).unwrap();
-        let rx_ring = ConsumerRingDefault::new(DmaBuffer::new(resp_buf), resp_csr_ring).unwrap();
+        let tx_ring =
+            ProducerRingDefault::new(DmaBuffer::new_for_spec::<CmdReqSpec>(req_buf), req_csr_ring)
+                .unwrap();
+        let rx_ring = ConsumerRingDefault::new(
+            DmaBuffer::new_for_spec::<CmdRespSpec>(resp_buf),
+            resp_csr_ring,
+        )
+        .unwrap();
 
         Ok(Self {
             cmd_qp: Mutex::new(CmdQp::new(tx_ring, rx_ring)),

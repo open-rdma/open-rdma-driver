@@ -1,4 +1,4 @@
-use super::desc_ring::DmaBuffer;
+use super::{desc_ring::DmaBuffer, RingPtr};
 use crate::ring::csr::ring_csr::ReaderOps;
 use crate::ring::{
     csr::RingCsr,
@@ -30,10 +30,11 @@ use std::{io, sync::atomic::fence};
 /// actual consumption without relying on `available()` for the boundary case.
 ///
 /// WARN: 读取的时候不会看 head ptr，而只是看 tail ptr 指向的 element 的标志位是否到达
-pub(crate) struct ConsumerRing<Dev, Spec, const BUF_SIZE_EXP: u8>
+pub(crate) struct ConsumerRing<Dev, Spec>
 where
     Dev: DeviceAdaptor,
     Spec: RingSpecToHost,
+    Spec::Element: FromRingBytes,
 {
     /// DMA buffer for descriptors (stores bytes representation)
     buffer: DmaBuffer<<Spec::Element as FromRingBytes>::Bytes>,
@@ -42,24 +43,20 @@ where
     csr_ring: RingCsr<Dev, Spec>,
 
     /// Cached local tail (software consumer pointer)
-    cached_tail: u32,
+    cached_tail: RingPtr<Spec>,
 
     /// Cached hardware head (hardware producer pointer).
     /// MODULAR value in [0, BUF_SIZE). NOT monotonically increasing.
-    cached_hw_head: u32,
+    cached_hw_head: RingPtr<Spec>,
 }
 
-impl<Dev, Spec, const BUF_SIZE_EXP: u8> ConsumerRing<Dev, Spec, BUF_SIZE_EXP>
+impl<Dev, Spec> ConsumerRing<Dev, Spec>
 where
     Dev: DeviceAdaptor,
     Spec: RingSpecToHost,
     Spec::Element: FromRingBytes,
     <Spec::Element as FromRingBytes>::Bytes: Debug,
 {
-    const BUF_SIZE: u32 = 1 << BUF_SIZE_EXP;
-    const BUF_SIZE_MASK: u32 = Self::BUF_SIZE - 1;
-    /// 13-bit mask covering both guard bit and idx, matches hardware's pointer width.
-    const HW_PTR_MASK: u32 = Self::BUF_SIZE * 2 - 1;
     /// Create a new consumer ring
     ///
     /// # Arguments
@@ -76,7 +73,7 @@ where
         csr_ring: RingCsr<Dev, Spec>,
     ) -> io::Result<Self> {
         assert!(
-            buffer.capacity() >= Self::BUF_SIZE,
+            buffer.capacity() == RingPtr::<Spec>::buf_size(),
             "buffer capacity mismatch"
         );
 
@@ -93,28 +90,28 @@ where
         Ok(Self {
             buffer,
             csr_ring,
-            cached_tail: 0,
-            cached_hw_head: 0,
+            cached_tail: RingPtr::zero(),
+            cached_hw_head: RingPtr::zero(),
         })
     }
 
     /// Get number of available elements to consume.
     pub(crate) fn available(&mut self) -> io::Result<usize> {
         // Read hardware head pointer (modular, in [0, BUF_SIZE))
-        let hw_head = self.csr_ring.read_head()?;
+        let hw_head = RingPtr::<Spec>::new(self.csr_ring.read_head()?);
         self.cached_hw_head = hw_head;
 
         // Modular distance: works correctly across wraparound
-        let available = hw_head.wrapping_sub(self.cached_tail) & Self::HW_PTR_MASK;
+        let available = hw_head.wrapping_sub(self.cached_tail);
 
         Ok(available as usize)
     }
 
     fn read_and_advance(&mut self) -> <Spec::Element as FromRingBytes>::Bytes {
-        let index = self.tail() & Self::BUF_SIZE_MASK;
+        let index = self.cached_tail.index();
         let ret = self.buffer.read(index);
         self.buffer.zero(index);
-        self.cached_tail = self.cached_tail.wrapping_add(1) & Self::HW_PTR_MASK;
+        self.cached_tail = self.cached_tail.wrapping_add(1);
         ret
     }
 
@@ -123,14 +120,13 @@ where
         // Hardware uses a {guard, idx} pointer of width BUF_SIZE_EXP+1 bits;
         // stripping the guard bit (using BUF_SIZE_MASK) would send the wrong
         // wrap generation and cause hardware to misdetect full/empty.
-        self.csr_ring
-            .write_tail(self.cached_tail & Self::HW_PTR_MASK)
+        self.csr_ring.write_tail(self.cached_tail.raw())
     }
 
     fn read_head_csr(&mut self) -> io::Result<u32> {
-        let hw_head = self.csr_ring.read_head()?;
+        let hw_head = RingPtr::<Spec>::new(self.csr_ring.read_head()?);
         self.cached_hw_head = hw_head;
-        Ok(hw_head)
+        Ok(hw_head.raw())
     }
 
     /// Pop single element with validation
@@ -173,13 +169,13 @@ where
         //     }
         // }
 
-        let idx_first = self.tail() & Self::BUF_SIZE_MASK;
+        let idx_first = self.cached_tail.index();
 
         let first_element = self.buffer.read(idx_first);
 
         if Spec::Element::is_valid(&first_element) {
             if Spec::Element::has_next(&first_element) {
-                let idx_next = idx_first.wrapping_add(1) & Self::BUF_SIZE_MASK;
+                let idx_next = self.cached_tail.add_index(1);
                 let second_element = self.buffer.read(idx_next);
                 if Spec::Element::is_valid(&second_element) {
                     fence(Ordering::Acquire);
@@ -261,10 +257,10 @@ where
     // }
 
     pub(crate) fn tail(&self) -> u32 {
-        self.cached_tail
+        self.cached_tail.raw()
     }
 
     pub(crate) fn cached_head(&self) -> u32 {
-        self.cached_hw_head
+        self.cached_hw_head.raw()
     }
 }

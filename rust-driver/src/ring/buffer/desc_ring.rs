@@ -27,6 +27,7 @@
 //! └─────────────────────────────────────────────────┘
 //! ```
 
+use crate::ring::traits::RingSpec;
 use crate::{mem::DmaBuf, types::PhysAddr};
 use std::ptr::{self, NonNull};
 
@@ -67,8 +68,8 @@ impl<T: Copy> Volatile<T> {
 /// and physical address (for hardware DMA).
 pub(crate) struct DmaBuffer<T> {
     buf: NonNull<Volatile<T>>,
-    capacity: u32,
     dma_buf: DmaBuf,
+    capacity: u32,
 }
 
 #[allow(unsafe_code)]
@@ -81,7 +82,7 @@ impl<T: Copy> DmaBuffer<T> {
     ///
     /// # Panics
     /// Panics if buffer is too small or pointer is null
-    pub(crate) fn new(dma_buf: DmaBuf) -> Self {
+    pub(crate) fn new(dma_buf: DmaBuf, capacity: u32) -> Self {
         log::debug!(
             "DmaBuffer: pa=0x{:x}, va={:?}, len={}",
             dma_buf.phys_addr().as_u64(),
@@ -93,7 +94,10 @@ impl<T: Copy> DmaBuffer<T> {
             "DMA buffer size must be multiple of element size"
         );
 
-        let capacity = (dma_buf.len() / size_of::<T>()) as u32;
+        assert!(
+            dma_buf.len() >= capacity as usize * size_of::<T>(),
+            "DMA buffer too small for ring capacity"
+        );
 
         // #[allow(clippy::as_conversions)]
         let ptr = dma_buf.as_ptr() as *mut Volatile<T>;
@@ -101,9 +105,14 @@ impl<T: Copy> DmaBuffer<T> {
 
         Self {
             buf,
-            capacity,
             dma_buf,
+            capacity,
         }
+    }
+
+    #[inline]
+    pub(crate) fn new_for_spec<Spec: RingSpec>(dma_buf: DmaBuf) -> Self {
+        Self::new(dma_buf, Spec::element_num())
     }
 
     /// Get the physical address of the DMA buffer (for hardware access)
@@ -162,7 +171,7 @@ impl<T: Copy> DmaBuffer<T> {
 
     /// Get buffer capacity
     #[inline]
-    pub(crate) fn capacity(&self) -> u32 {
+    pub(crate) const fn capacity(&self) -> u32 {
         self.capacity
     }
 }

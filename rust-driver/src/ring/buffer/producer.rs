@@ -1,4 +1,4 @@
-use super::desc_ring::DmaBuffer;
+use super::{desc_ring::DmaBuffer, RingPtr};
 use crate::ring::{
     csr::RingCsr,
     traits::{DeviceAdaptor, RingSpecToCard, ToRingBytes},
@@ -39,7 +39,7 @@ use crate::ring::csr::ring_csr::WriterOps;
 ///
 /// # Example
 /// ```rust,ignore
-/// let ring: ProducerRing<_, SendRingSpec, [u8; 32], 12> = ...;
+/// let ring: ProducerRing<_, SendRingSpec> = ...;
 ///
 /// // Single push
 /// ring.try_push(descriptor)?;
@@ -52,10 +52,11 @@ use crate::ring::csr::ring_csr::WriterOps;
 /// slots.commit()?;  // Single CSR write for all 10 descriptors
 /// ```
 /// TODO need to change to lazy sync
-pub(crate) struct ProducerRing<Dev, Spec, const BUF_SIZE_EXP: u8>
+pub(crate) struct ProducerRing<Dev, Spec>
 where
     Dev: DeviceAdaptor,
     Spec: RingSpecToCard,
+    Spec::Element: ToRingBytes, // 必须显式添加，用于字段类型检查
 {
     /// DMA buffer for descriptors (stores bytes representation)
     buffer: DmaBuffer<<Spec::Element as ToRingBytes>::Bytes>,
@@ -64,28 +65,23 @@ where
     csr_ring: RingCsr<Dev, Spec>,
 
     /// Cached local head (software producer pointer)
-    cached_head: u32,
+    cached_head: RingPtr<Spec>,
 
     /// Cached hardware tail (hardware consumer pointer).
     /// MODULAR value in [0, BUF_SIZE). NOT monotonically increasing.
     /// Updated lazily on space checks.
-    cached_hw_tail: u32,
+    cached_hw_tail: RingPtr<Spec>,
 
     /// Phantom data to mark the logical element type
     _phantom: PhantomData<<Spec::Element as ToRingBytes>::Bytes>,
 }
 
-impl<Dev, Spec, const BUF_SIZE_EXP: u8> ProducerRing<Dev, Spec, BUF_SIZE_EXP>
+impl<Dev, Spec> ProducerRing<Dev, Spec>
 where
     Dev: DeviceAdaptor,
     Spec: RingSpecToCard,
     Spec::Element: ToRingBytes,
 {
-    const BUF_SIZE: u32 = 1 << BUF_SIZE_EXP;
-    const BUF_SIZE_MASK: u32 = Self::BUF_SIZE - 1;
-    /// 13-bit mask covering both guard bit and idx, matches hardware's pointer width.
-    const HW_PTR_MASK: u32 = Self::BUF_SIZE * 2 - 1;
-
     /// Create a new producer ring
     ///
     /// # Arguments
@@ -102,7 +98,7 @@ where
         csr_ring: RingCsr<Dev, Spec>,
     ) -> io::Result<Self> {
         assert!(
-            buffer.capacity() >= Self::BUF_SIZE,
+            buffer.capacity() == RingPtr::<Spec>::buf_size(),
             "buffer capacity mismatch"
         );
 
@@ -118,8 +114,8 @@ where
         Ok(Self {
             buffer,
             csr_ring,
-            cached_head: 0,
-            cached_hw_tail: 0,
+            cached_head: RingPtr::zero(),
+            cached_hw_tail: RingPtr::zero(),
             _phantom: PhantomData,
         })
     }
@@ -132,22 +128,20 @@ where
         // Read hardware tail pointer (modular, in [0, BUF_SIZE))
         let hw_tail = self.cached_hw_tail;
 
-        let hw_tail_mod = hw_tail & Self::BUF_SIZE_MASK;
-
-        let head_mod = self.cached_head & Self::BUF_SIZE_MASK;
-        let head_with_guard = self.cached_head & Self::HW_PTR_MASK;
-
-        if hw_tail_mod == head_mod {
-            if head_with_guard == hw_tail {
-                return Ok(Self::BUF_SIZE);
+        if self.cached_head.has_same_index(hw_tail) {
+            if self.cached_head.has_same_raw(hw_tail) {
+                return Ok(RingPtr::<Spec>::buf_size());
             } else {
                 return Ok(0);
             }
         }
-        let used =
-            head_mod.wrapping_sub(hw_tail).wrapping_add(Self::BUF_SIZE) & Self::BUF_SIZE_MASK;
+        let used = self.cached_head
+            .index()
+            .wrapping_sub(hw_tail.raw())
+            .wrapping_add(RingPtr::<Spec>::buf_size())
+            & RingPtr::<Spec>::buf_size_mask();
 
-        Ok(Self::BUF_SIZE - used)
+        Ok(RingPtr::<Spec>::buf_size() - used)
     }
 
     /// Batch write using a callback function
@@ -178,7 +172,7 @@ where
             return Ok(0);
         }
 
-        if count > Self::BUF_SIZE {
+        if count > RingPtr::<Spec>::buf_size() {
             return Ok(0);
         }
 
@@ -195,7 +189,7 @@ where
         for i in 0..count {
             let value = writer(i);
             let bytes = value.to_bytes();
-            let index = start_head.wrapping_add(i) & Self::BUF_SIZE_MASK;
+            let index = start_head.wrapping_add(i).index();
             self.buffer.write(index, bytes);
         }
 
@@ -204,7 +198,7 @@ where
 
         // Commit all descriptors with single CSR write
         let new_head = start_head.wrapping_add(count);
-        self.csr_ring.write_head(new_head)?;
+        self.csr_ring.write_head(new_head.raw())?;
         self.cached_head = new_head;
 
         Ok(count)
@@ -285,18 +279,16 @@ where
                 return Ok(false);
             }
         }
-        let index = self.cached_head & Self::BUF_SIZE_MASK;
-
         elements.into_iter().enumerate().for_each(|(i, element)| {
             self.buffer
-                .write((i as u32 + index) & Self::BUF_SIZE_MASK, element.to_bytes())
+                .write(self.cached_head.add_index(i as u32), element.to_bytes())
         });
 
         // Release fence ensures descriptor write is visible to hardware
         fence(Ordering::Release);
 
         let new_head = self.cached_head.wrapping_add(elements.len() as u32);
-        self.csr_ring.write_head(new_head)?;
+        self.csr_ring.write_head(new_head.raw())?;
         self.cached_head = new_head;
 
         Ok(true)
@@ -304,19 +296,19 @@ where
 
     /// Get current head pointer value
     pub(crate) fn head(&self) -> u32 {
-        self.cached_head
+        self.cached_head.raw()
     }
 
     /// Get current cached tail pointer value (may be stale)
     pub(crate) fn cached_tail(&self) -> u32 {
-        self.cached_hw_tail
+        self.cached_hw_tail.raw()
     }
 
     /// Manually synchronize tail from hardware
     pub(crate) fn sync_tail(&mut self) -> io::Result<()> {
         log::trace!("sync_tail");
-        let hw_tail = self.csr_ring.read_tail()?;
-        log::info!("sync_tail: hw_tail={}", hw_tail);
+        let hw_tail = RingPtr::<Spec>::new(self.csr_ring.read_tail()?);
+        log::info!("sync_tail: hw_tail={}", hw_tail.raw());
         self.cached_hw_tail = hw_tail;
         Ok(())
     }
@@ -327,7 +319,7 @@ where
     /// Caller must ensure this doesn't create inconsistent state
     pub(crate) fn force_set_head(&mut self, head: u32) -> io::Result<()> {
         self.csr_ring.write_head(head)?;
-        self.cached_head = head;
+        self.cached_head = RingPtr::new(head);
 
         Ok(())
     }

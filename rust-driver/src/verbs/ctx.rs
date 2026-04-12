@@ -106,15 +106,21 @@ where
         debug!("device adaptor initialized...");
         let mut allocator = device.new_dma_buf_allocator()?;
         let mut rb_allocator = DefaultDescRingBufAllocator::new(&mut allocator);
-        let cmd_controller =
-            CommandConfigurator::init(&adaptor, rb_allocator.alloc()?, rb_allocator.alloc()?)?;
+        let cmd_controller = CommandConfigurator::init(
+            &adaptor,
+            rb_allocator.alloc_for_spec::<crate::ring::spec::CmdReqSpec>()?,
+            rb_allocator.alloc_for_spec::<crate::ring::spec::CmdRespSpec>()?,
+        )?;
         debug!("command queue request controller initialized...");
-        let send_bufs = iter::repeat_with(|| rb_allocator.alloc())
-            .take(mode.num_channel())
-            .collect::<std::result::Result<_, _>>()?;
-        let meta_bufs = iter::repeat_with(|| rb_allocator.alloc())
-            .take(mode.num_channel())
-            .collect::<std::result::Result<_, _>>()?;
+        let send_bufs =
+            iter::repeat_with(|| rb_allocator.alloc_for_spec::<crate::ring::spec::SendRingSpec>())
+                .take(mode.num_channel())
+                .collect::<std::result::Result<_, _>>()?;
+        let meta_bufs = iter::repeat_with(|| {
+            rb_allocator.alloc_for_spec::<crate::ring::spec::MetaReportRingSpec>()
+        })
+        .take(mode.num_channel())
+        .collect::<std::result::Result<_, _>>()?;
 
         let (rdma_write_tx, rdma_write_rx) = task_channel();
         let (completion_tx, completion_rx) = task_channel();
@@ -134,8 +140,8 @@ where
         let cq_table = CompletionQueueTable::new();
         let simple_nic_controller = SimpleNicController::init(
             &adaptor,
-            rb_allocator.alloc()?,
-            rb_allocator.alloc()?,
+            rb_allocator.alloc_for_spec::<crate::ring::spec::SimpleNicTxSpec>()?,
+            rb_allocator.alloc_for_spec::<crate::ring::spec::SimpleNicRxSpec>()?,
             rb_allocator.alloc()?,
             rx_buffer,
         )?;

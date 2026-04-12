@@ -47,7 +47,6 @@
 //! - `num_channel()`: Total number of active channels
 //! - `channel_ids()`: Slice of valid channel indices for iteration
 
-
 #[derive(Default, Clone, Copy)]
 pub(crate) enum Mode {
     Mode400G,

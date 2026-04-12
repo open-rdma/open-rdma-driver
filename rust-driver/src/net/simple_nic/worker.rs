@@ -41,8 +41,16 @@ impl<Dev: DeviceAdaptor> SimpleNicController<Dev> {
     ) -> io::Result<Self> {
         let req_csr_ring = simple_nic_tx_ring(dev.clone());
         let resp_csr_ring = simple_nic_rx_ring(dev.clone());
-        let tx_ring = ProducerRingDefault::new(DmaBuffer::new(tx_rb_buf), req_csr_ring).unwrap();
-        let rx_ring = ConsumerRingDefault::new(DmaBuffer::new(rx_rb_buf), resp_csr_ring).unwrap();
+        let tx_ring = ProducerRingDefault::new(
+            DmaBuffer::new_for_spec::<SimpleNicTxSpec>(tx_rb_buf),
+            req_csr_ring,
+        )
+        .unwrap();
+        let rx_ring = ConsumerRingDefault::new(
+            DmaBuffer::new_for_spec::<SimpleNicRxSpec>(rx_rb_buf),
+            resp_csr_ring,
+        )
+        .unwrap();
 
         Ok(Self {
             tx: FrameTxQueue::new(tx_ring, tx_buffer.buf, tx_buffer.phys_addr),

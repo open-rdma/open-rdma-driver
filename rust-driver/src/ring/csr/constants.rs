@@ -60,7 +60,6 @@
 //! - `RING_OFFSET_BASE_LOW` / `RING_OFFSET_BASE_HIGH` - Physical address registers
 //! - `RING_OFFSET_HEAD` / `RING_OFFSET_TAIL` - Producer/consumer pointers
 
-
 #[derive(Clone, Copy)]
 enum BlockStart {
     Qp = 0x00,
@@ -105,3 +104,8 @@ pub(crate) const QP_SEND_RING_BASES: [usize; NUM_QPS] = generate_qp_array_start!
 pub(crate) const QP_RECV_RING_BASES: [usize; NUM_QPS] = generate_qp_array_start!(true);
 
 pub(super) const CSR_DEVICE_MODE_ADDR: usize = 0;
+
+/// Number of bits used to represent the length of the ring buffer.
+pub(crate) const RING_BUF_LEN_BITS: u8 = 12;
+/// Highest bit of the ring buffer
+pub(crate) const RING_BUF_LEN: usize = 1 << RING_BUF_LEN_BITS;
