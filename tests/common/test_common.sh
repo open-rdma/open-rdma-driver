@@ -279,9 +279,67 @@ print_test_start() {
 print_test_end() {
     local test_name=$1
     print_separator
-    echo "Test completed: $test_name"
+    echo "Test completed successfully: $test_name"
     echo "Check logs in: $LOG_DIR"
     print_separator
+}
+
+# 打印测试失败信息
+print_test_failed() {
+    local test_name=$1
+    print_separator
+    echo "Test failed: $test_name" >&2
+    echo "Check logs in: $LOG_DIR" >&2
+    print_separator >&2
+}
+
+# 处理 wait 返回的进程退出状态
+# 参数:
+#   $1: 角色名/进程名
+#   $2: PID
+#   $3: wait 返回码
+#   $4: 日志路径（可选）
+handle_process_exit_status() {
+    local process_name=$1
+    local pid=$2
+    local exit_code=$3
+    local log_path=$4
+
+    if [ "$exit_code" -eq 0 ]; then
+        echo "$process_name exited successfully (pid=$pid)"
+        return 0
+    fi
+
+    if [ "$exit_code" -ge 128 ]; then
+        local signal_num=$((exit_code - 128))
+        local signal_name
+        signal_name=$(kill -l "$signal_num" 2>/dev/null || echo "$signal_num")
+        echo "Error: $process_name (pid=$pid) was terminated by signal $signal_name ($signal_num)" >&2
+    else
+        echo "Error: $process_name (pid=$pid) exited with code $exit_code" >&2
+    fi
+
+    if [ -n "$log_path" ]; then
+        echo "Log: $log_path" >&2
+    fi
+
+    return 1
+}
+
+# 等待指定进程并检查退出状态
+# 参数:
+#   $1: 角色名/进程名
+#   $2: PID
+#   $3: 日志路径（可选）
+wait_for_test_process() {
+    local process_name=$1
+    local pid=$2
+    local log_path=$3
+    local exit_code
+
+    wait "$pid"
+    exit_code=$?
+    handle_process_exit_status "$process_name" "$pid" "$exit_code" "$log_path"
 }
 
 # 清理 RTL 模拟器进程

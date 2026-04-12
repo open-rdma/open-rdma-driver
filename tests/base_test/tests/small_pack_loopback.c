@@ -126,7 +126,7 @@ int run_loopback_test(int msg_len, int num_rounds)
       fprintf(stderr, "[ERROR] ibv_post_send failed\n");
       failed_rounds++;
       fprintf(stderr, "panic: %s\n", "Work completion failed");
-      exit(0);
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -181,7 +181,7 @@ int run_loopback_test(int msg_len, int num_rounds)
       fprintf(stderr, "[ERROR] Work completion failed: status=%d\n", wc.status);
       failed_rounds++;
       fprintf(stderr, "panic: %s\n", "Work completion failed");
-      exit(0);
+      exit(EXIT_FAILURE);
     }
 
     printf("[LOOPBACK] RDMA WRITE completed (wr_id=%lu, status=%d)\n", wc.wr_id,

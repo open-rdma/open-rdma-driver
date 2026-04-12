@@ -96,7 +96,23 @@ CLIENT_PID=$!
 echo "Client PID: $CLIENT_PID (log: $LOG_DIR/client.log)"
 
 # 只等待测试程序，不等待 RTL 进程
-wait $SERVER_PID $CLIENT_PID
+FAILED=0
+
+if ! wait_for_test_process "server" "$SERVER_PID" "$LOG_DIR/server.log"; then
+    FAILED=1
+fi
+
+if ! wait_for_test_process "client" "$CLIENT_PID" "$LOG_DIR/client.log"; then
+    FAILED=1
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    print_test_failed "$TEST_PROGRAM"
+    echo "Logs saved to: $LOG_DIR" >&2
+    echo "  - Server log: $LOG_DIR/server.log" >&2
+    echo "  - Client log: $LOG_DIR/client.log" >&2
+    exit 1
+fi
 
 # 打印测试结束信息
 print_test_end "$TEST_PROGRAM"

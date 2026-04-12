@@ -85,14 +85,18 @@ done
 
 # 等待全部测试程序，不等待 RTL 进程；任一失败则退出失败
 FAILED=0
-for pid in "${NODE_PIDS[@]}"; do
-    if ! wait "$pid"; then
+for i in "${!NODE_PIDS[@]}"; do
+    pid="${NODE_PIDS[$i]}"
+    if ! wait_for_test_process "node $i" "$pid" "$LOG_DIR/node_$i.log"; then
         FAILED=1
     fi
 done
 
 if [ "$FAILED" -ne 0 ]; then
-    echo "One or more nodes failed"
+    print_test_failed "$TEST_PROGRAM"
+    echo "One or more nodes failed" >&2
+    echo "Logs saved to: $LOG_DIR" >&2
+    echo "  - Node logs: $LOG_DIR/node_*.log" >&2
     exit 1
 fi
 

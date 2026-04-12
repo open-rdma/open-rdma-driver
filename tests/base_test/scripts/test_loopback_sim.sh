@@ -45,8 +45,11 @@ LOOPBACK_PID=$!
 echo "Loopback test PID: $LOOPBACK_PID"
 
 # 只等待测试程序，不等待 RTL 进程
-wait $LOOPBACK_PID
+if ! wait_for_test_process "loopback test" "$LOOPBACK_PID" "$LOG_DIR/loopback.log"; then
+    print_test_failed "loopback"
+    echo "Log saved to: $LOG_DIR/loopback.log" >&2
+    exit 1
+fi
 
 # 打印测试结束信息
 print_test_end "loopback"
-
