@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::io;
 use std::marker::PhantomData;
 
@@ -28,6 +29,17 @@ impl<Spec: RingSpec> Copy for RingPtr<Spec> {}
 impl<Spec: RingSpec> Clone for RingPtr<Spec> {
     fn clone(&self) -> Self {
         *self
+    }
+}
+
+impl<Spec: RingSpec> Display for RingPtr<Spec> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "RingPtr {{ raw: {}, index: {} }}",
+            self.raw(),
+            self.index()
+        )
     }
 }
 
