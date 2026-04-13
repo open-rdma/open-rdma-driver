@@ -20,3 +20,5 @@ examples/send_recv
 examples/rdma_client_server
 
 **/.cargo/
+
+**/log/
