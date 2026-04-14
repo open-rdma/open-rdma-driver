@@ -44,10 +44,38 @@ source ~/miniconda3/bin/activate
 conda init --all
 ```
 
+推荐创建独立的 Python 环境，避免与系统环境或其他 `cocotb` 版本冲突：
+
 ```bash
-pip install cocotb==1.9.2 cocotb-test cocotbext-pcie cocotbext-axi scapy
+conda create -n cocotb2 python=3.13
+conda activate cocotb2
 ```
-注意目前的测试代码不兼容 cocotb 2.0
+
+先安装 `cocotb` 的开发版（本文档当前使用 `cocotb` 仓库 `a18883468b7de9d4feca497c67db81faf392bdcf` 这个 commit）：
+
+```bash
+python -m pip install "cocotb @ git+https://github.com/cocotb/cocotb@a18883468b7de9d4feca497c67db81faf392bdcf"
+```
+
+再安装与当前仿真环境配套的 Python 依赖：
+
+```bash
+python -m pip install cocotb-test cocotbext-pcie cocotbext-axi scapy
+```
+
+可以用下面的命令检查安装结果：
+
+```bash
+python -m pip show cocotb cocotb-bus cocotbext-pcie cocotbext-axi cocotb-test
+python -m pip check
+cocotb-config --version
+```
+
+**说明**：
+- 本文档使用 `cocotb` dev 版本，而不是 PyPI 上的稳定版 `1.9.2`
+- 当前实测可安装的配套组合包括 `cocotb-bus 0.3.0`、`cocotbext-axi 0.1.28`、`cocotbext-pcie 0.2.16`、`cocotb-test 0.2.6`
+- 如果环境里曾安装过 `cocotb==1.9.2` 或其他旧版本，建议先在新环境中重新安装，避免残留依赖影响仿真
+- 如果遇到 `VerilatedVpi::*` 编译错误或 `No GPI_USERS specified, exiting...`，请参考：[cocotb dev 环境中 GPI_USERS 与 Verilator 兼容性说明](./detail/cocotb-gpi-users-and-verilator-compat.md)
 
 **说明**：
 - 使用 `verilator`（非 `iverilog`）进行仿真

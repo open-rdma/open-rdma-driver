@@ -42,10 +42,38 @@ source ~/miniconda3/bin/activate
 conda init --all
 ```
 
+We recommend creating a dedicated Python environment to avoid conflicts with the system environment or other `cocotb` versions:
+
 ```bash
-pip install cocotb==1.9.2 cocotb-test cocotbext-pcie cocotbext-axi scapy
+conda create -n cocotb2 python=3.13
+conda activate cocotb2
 ```
-Note: the current test code is not compatible with cocotb 2.0.
+
+First install the `cocotb` development version. This document currently uses commit `a18883468b7de9d4feca497c67db81faf392bdcf` from the `cocotb` repository:
+
+```bash
+python -m pip install "cocotb @ git+https://github.com/cocotb/cocotb@a18883468b7de9d4feca497c67db81faf392bdcf"
+```
+
+Then install the matching Python dependencies for the current simulation environment:
+
+```bash
+python -m pip install cocotb-test cocotbext-pcie cocotbext-axi scapy
+```
+
+You can verify the installation with:
+
+```bash
+python -m pip show cocotb cocotb-bus cocotbext-pcie cocotbext-axi cocotb-test
+python -m pip check
+cocotb-config --version
+```
+
+**Notes**:
+- This document uses the `cocotb` development version instead of the PyPI stable release `1.9.2`
+- A tested package combination is `cocotb-bus 0.3.0`, `cocotbext-axi 0.1.28`, `cocotbext-pcie 0.2.16`, and `cocotb-test 0.2.6`
+- If the environment previously had `cocotb==1.9.2` or any other older version installed, it is safer to recreate the environment and reinstall from scratch
+- If you hit `VerilatedVpi::*` build errors or `No GPI_USERS specified, exiting...`, see [cocotb dev GPI_USERS and Verilator compatibility note](./detail/cocotb-gpi-users-and-verilator-compat.md)
 
 **Notes**:
 - `verilator` (not `iverilog`) is used for simulation
