@@ -28,6 +28,7 @@ print_test_start "loopback_perf"
 # 初始化测试环境
 init_test_environment
 
+export RUSTFLAGS="-C force-frame-pointers=yes"
 # 编译 Rust 驱动（release 模式，同时设置 LD_LIBRARY_PATH）
 build_rust_driver "hw" "release"
 
@@ -38,7 +39,7 @@ ROUND=${2:-10}
 RUST_LOG=${RUST_LOG:-info}
 
 # perf 采样频率（Hz），默认 99
-PERF_FREQ=${PERF_FREQ:-99}
+PERF_FREQ=${PERF_FREQ:-99999}
 
 echo "Running loopback perf test with MSG_LEN=$MSG_LEN"
 
@@ -61,7 +62,7 @@ PERF_DATA="$PERF_DIR/perf.data"
 echo "Starting perf record (freq=${PERF_FREQ}Hz) directly wrapping ib_write_bw ..."
 sudo perf record \
     -F ${PERF_FREQ} \
-    -g --call-graph dwarf \
+    -g --call-graph fp \
     -o "$PERF_DATA" \
     -- env \
         RUST_LOG=${RUST_LOG} \

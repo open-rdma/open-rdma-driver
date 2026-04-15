@@ -135,7 +135,8 @@ where
                 return Ok(0);
             }
         }
-        let used = self.cached_head
+        let used = self
+            .cached_head
             .index()
             .wrapping_sub(hw_tail.raw())
             .wrapping_add(RingPtr::<Spec>::buf_size())
@@ -243,17 +244,17 @@ where
 
     pub(crate) fn try_push_atomic(&mut self, elements: &[Spec::Element]) -> io::Result<bool> {
         // std::thread::sleep(std::time::Duration::from_nanos(1000));
-
+        self.sync_tail()?;
         let avai = self.available()?;
-        // self.sync_tail()?;
-        // if avai < 1000 {
-        //     log::warn!(
-        //         "try_push_atomic near overflow: available={}, hw_head is {}, tail is {}",
-        //         avai,
-        //         self.cached_head,
-        //         self.cached_hw_tail
-        //     );
-        // }
+
+        if avai < 4097 {
+            log::warn!(
+                "try_push_atomic near overflow: available={}, hw_head is {}, tail is {}",
+                avai,
+                self.cached_head,
+                self.cached_hw_tail
+            );
+        }
 
         // use std::sync::atomic::{AtomicU64, Ordering};
         // use std::time::{SystemTime, UNIX_EPOCH};
