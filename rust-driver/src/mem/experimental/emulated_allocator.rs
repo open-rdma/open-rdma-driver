@@ -1,10 +1,11 @@
 //! Emulated page allocator for simulation mode.
 
-use std::{io, sync::Arc};
+use std::io;
 
-use parking_lot::RwLock;
-
-use crate::mem::{address::PaVaMap, DmaBuf, DmaBufAllocator, UDmaBufAllocator};
+use crate::{
+    mem::{address::PaVaMap, mmap::MmapMut, DmaBuf, DmaBufAllocator, PAGE_SIZE},
+    types::{PhysAddr, VirtAddr},
+};
 
 const DEFAULT_ALLOCATOR_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
@@ -12,11 +13,10 @@ const DEFAULT_ALLOCATOR_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 ///
 /// This allocator pre-allocates a large block of memory and divides it into
 /// individual pages for allocation.
-// #[derive(Debug)]
+#[derive(Debug)]
 pub(crate) struct EmulatedPageAllocator<const N: usize> {
     /// Stack of available memory pages
-    inner: UDmaBufAllocator,
-    pa_va_map: Arc<RwLock<PaVaMap>>,
+    inner: Vec<MmapMut>,
 }
 
 impl<const N: usize> EmulatedPageAllocator<N> {
@@ -32,34 +32,50 @@ impl<const N: usize> EmulatedPageAllocator<N> {
     /// * `size` - Optional size of the memory pool (defaults to 128 MiB)
     /// * `pa_va_map` - PA-VA mapping table to register the allocated memory
     #[allow(clippy::as_conversions)] // usize to *mut c_void is safe
-    pub(crate) fn new(
-        size: Option<usize>,
-        pa_va_map: Arc<RwLock<PaVaMap>>,
-        udmabuf_index: usize,
-    ) -> Self {
-        let inner = UDmaBufAllocator::open_with_index(udmabuf_index)
-            .expect("Failed to create UDmaBufAllocator");
+    pub(crate) fn new(size: Option<usize>, pa_va_map: &mut PaVaMap) -> Self {
+        let size = size.unwrap_or(DEFAULT_ALLOCATOR_SIZE);
+        let ptr = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+                -1,
+                0,
+            )
+        };
 
-        Self { inner, pa_va_map }
+        if ptr == libc::MAP_FAILED {
+            panic!("Failed to allocate memory");
+        }
+
+        // WARN: Assumes VA will never overlap with real PA
+        pa_va_map.insert(PhysAddr::new(ptr as u64), VirtAddr::new(ptr as u64), size);
+
+        let inner: Vec<_> = (0..size)
+            .step_by(PAGE_SIZE)
+            .map(|offset| MmapMut::new(unsafe { ptr.offset(offset as isize) }, PAGE_SIZE))
+            .collect();
+
+        Self { inner }
     }
 }
 
 impl DmaBufAllocator for EmulatedPageAllocator<1> {
     #[allow(clippy::unwrap_in_result, clippy::unwrap_used)]
-    fn alloc(&mut self, len: usize) -> io::Result<DmaBuf> {
-        let buf = self.inner.alloc(len)?;
-
-        self.pa_va_map
-            .write()
-            .insert(buf.phys_addr(), buf.virt_addr(), buf.len());
-
-        Ok(buf)
+    fn alloc(&mut self, _len: usize) -> io::Result<DmaBuf> {
+        let buf = self
+            .inner
+            .pop()
+            .ok_or(io::Error::from(io::ErrorKind::OutOfMemory))?;
+        // WARN: Assumes DMA buffer VA = PA (emulation simplification)
+        let phys_addr = PhysAddr::new(buf.as_ptr() as u64);
+        Ok(DmaBuf::new(buf, phys_addr))
     }
 }
 
 #[test]
 fn test_libc_behave() {
-    use crate::mem::PAGE_SIZE;
     unsafe {
         let ptr = libc::mmap(
             std::ptr::null_mut(),

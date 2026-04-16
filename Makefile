@@ -6,7 +6,8 @@ UDMABUF_SRC_DIR := third_party/udmabuf
 
 BLUERDMA_KO := bluerdma.ko
 UDMABUF_KO := u-dma-buf.ko
-UDMABUF_PARAMS := udmabuf0=2097152
+UDMABUF_SIZE ?= 2097152
+UDMABUF_PARAMS := udmabuf0=$(UDMABUF_SIZE) udmabuf1=$(UDMABUF_SIZE) udmabuf2=$(UDMABUF_SIZE) udmabuf3=$(UDMABUF_SIZE)
 
 # Phony targets
 .PHONY: all clean install uninstall modules bluerdma udmabuf help

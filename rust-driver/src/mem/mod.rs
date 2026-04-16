@@ -35,7 +35,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::types::PhysAddr;
+use crate::types::{PhysAddr, VirtAddr};
 use mmap::MmapMut;
 
 // Re-export commonly used types
@@ -91,6 +91,11 @@ impl DmaBuf {
     /// Returns the physical address of the buffer.
     pub(crate) fn phys_addr(&self) -> PhysAddr {
         self.phys_addr
+    }
+
+    /// Returns the virtual address of the buffer.
+    pub(crate) fn virt_addr(&self) -> VirtAddr {
+        VirtAddr::new(self.buf.as_ptr() as u64)
     }
 }
 

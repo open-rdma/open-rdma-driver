@@ -31,16 +31,29 @@ pub(crate) trait HwDevice {
 
 pub(crate) struct PciHwDevice {
     sysfs_path: PathBuf,
+    udmabuf_index: usize,
 }
 
 impl PciHwDevice {
     pub(crate) fn new(sysfs_path: impl AsRef<Path>) -> Self {
+        Self::new_with_udmabuf_index(sysfs_path, 0)
+    }
+
+    pub(crate) fn new_with_udmabuf_index(
+        sysfs_path: impl AsRef<Path>,
+        udmabuf_index: usize,
+    ) -> Self {
         Self {
             sysfs_path: sysfs_path.as_ref().into(),
+            udmabuf_index,
         }
     }
 
     pub(crate) fn open_default() -> io::Result<Self> {
+        Self::open_default_with_udmabuf_index(0)
+    }
+
+    pub(crate) fn open_default_with_udmabuf_index(udmabuf_index: usize) -> io::Result<Self> {
         let build_err = || io::Error::new(io::ErrorKind::Other, "Failed to open device");
         let info = PciInfo::enumerate_pci().map_err(|_err| build_err())?;
         let device = info
@@ -51,7 +64,10 @@ impl PciHwDevice {
         let location = device.location().map_err(|_err| build_err())?;
         let sysfs_path = PathBuf::from(PCI_SYSFS_BUS_PATH).join(location.to_string());
 
-        Ok(Self { sysfs_path })
+        Ok(Self {
+            sysfs_path,
+            udmabuf_index,
+        })
     }
 
     pub(crate) fn reset(&self) -> io::Result<()> {
@@ -99,7 +115,7 @@ impl HwDevice for PciHwDevice {
     }
 
     fn new_dma_buf_allocator(&self) -> Result<Self::DmaBufAllocator> {
-        UDmaBufAllocator::open().map_err(Into::into)
+        UDmaBufAllocator::open_with_index(self.udmabuf_index).map_err(Into::into)
     }
 
     fn new_umem_handler(&self) -> Self::UmemHandler {
@@ -110,10 +126,19 @@ impl HwDevice for PciHwDevice {
 pub(crate) struct EmulatedHwDevice {
     addr: String,
     pa_va_map: Arc<RwLock<PaVaMap>>,
+    udmabuf_index: usize,
 }
 
 impl EmulatedHwDevice {
     pub(crate) fn new(csr_addr: String, pcie_addr: String) -> Self {
+        Self::new_with_udmabuf_index(csr_addr, pcie_addr, 0)
+    }
+
+    pub(crate) fn new_with_udmabuf_index(
+        csr_addr: String,
+        pcie_addr: String,
+        udmabuf_index: usize,
+    ) -> Self {
         // 需要启动pcie client
         let pa_va_map = Arc::new(RwLock::new(PaVaMap::new()));
         let tcp_server_addr = pcie_addr.parse().unwrap();
@@ -124,6 +149,7 @@ impl EmulatedHwDevice {
         Self {
             addr: csr_addr,
             pa_va_map,
+            udmabuf_index,
         }
     }
 
@@ -145,8 +171,11 @@ impl HwDevice for EmulatedHwDevice {
     }
 
     fn new_dma_buf_allocator(&self) -> Result<Self::DmaBufAllocator> {
-        let mut pa_va_map = self.pa_va_map.write();
-        Ok(EmulatedPageAllocator::new(None, &mut pa_va_map))
+        Ok(EmulatedPageAllocator::new(
+            None,
+            self.pa_va_map.clone(),
+            self.udmabuf_index,
+        ))
     }
 
     fn new_umem_handler(&self) -> Self::UmemHandler {

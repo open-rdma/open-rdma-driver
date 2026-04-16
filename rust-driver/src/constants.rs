@@ -44,7 +44,7 @@ pub(crate) const POST_RECV_TCP_LOOP_BACK_CLIENT_ADDRESS: Ipv4Addr = Ipv4Addr::ne
 pub(crate) const BLUE_RDMA_SYSFS_PATH: &str = "/sys/class/infiniband/bluerdma0";
 pub(crate) const BLUE_RDMA_NETDEV_INTERFACE_NAME: &str = "blue0";
 
-pub(crate) const U_DMA_BUF_CLASS_PATH: &str = "/sys/class/u-dma-buf/udmabuf0";
+pub(crate) const U_DMA_BUF_CLASS_PATH: &str = "/sys/class/u-dma-buf";
 
 pub(crate) const PAGE_SIZE_2MB: usize = 1 << 21;
 

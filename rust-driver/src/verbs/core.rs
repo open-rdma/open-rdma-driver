@@ -39,13 +39,27 @@ impl BlueRdmaCore {
         assert!(env_logger::try_init().is_err(), "global logger init failed");
     }
 
+    fn udmabuf_index_from_sysfs_name(sysfs_name: &str) -> Result<usize> {
+        sysfs_name
+            .chars()
+            .last()
+            .and_then(|c| c.to_digit(10))
+            .map(|idx| idx as usize)
+            .ok_or_else(|| {
+                RdmaError::InvalidInput(format!(
+                    "sysfs_name must end with a digit, got: {sysfs_name}"
+                ))
+            })
+    }
+
     #[allow(clippy::unwrap_used, clippy::unwrap_in_result)]
     pub(super) fn new_hw(sysfs_name: &str) -> Result<HwDeviceCtx<PciHwDevice>> {
         Self::check_logger_inited();
+        let udmabuf_index = Self::udmabuf_index_from_sysfs_name(sysfs_name)?;
         debug!("before load default");
         let config = ConfigLoader::load_default()?;
         debug!("before open default");
-        let device = PciHwDevice::open_default()?;
+        let device = PciHwDevice::open_default_with_udmabuf_index(udmabuf_index)?;
 
         debug!("before reset device");
         device.reset()?;
@@ -61,19 +75,16 @@ impl BlueRdmaCore {
     #[allow(clippy::unwrap_used, clippy::unwrap_in_result)]
     pub(super) fn new_emulated(sysfs_name: &str) -> Result<HwDeviceCtx<EmulatedHwDevice>> {
         log::info!("initializing emulated device with sysfs name: {sysfs_name}");
-        let rank_offset = sysfs_name
-            .chars()
-            .last()
-            .and_then(|c| c.to_digit(10))
-            .ok_or_else(|| {
-                RdmaError::InvalidInput(format!(
-                    "sysfs_name must end with a digit, got: {sysfs_name}"
-                ))
-            })? as u16;
+        let udmabuf_index = Self::udmabuf_index_from_sysfs_name(sysfs_name)?;
+        let rank_offset = udmabuf_index as u16;
 
         let csr_addr = format!("127.0.0.1:{}", 7701u16 + rank_offset);
         let post_recv_addr = format!("127.0.0.1:{}", 7003u16 + rank_offset);
-        let device = EmulatedHwDevice::new(csr_addr.into(), post_recv_addr.into());
+        let device = EmulatedHwDevice::new_with_udmabuf_index(
+            csr_addr.into(),
+            post_recv_addr.into(),
+            udmabuf_index,
+        );
 
         let ack = AckTimeoutConfig::new(16, 40, 2);
         let config = DeviceConfig { ack };
