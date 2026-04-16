@@ -87,6 +87,7 @@ impl SingleThreadTaskWorker for RdmaWriteWorker {
         //     // std::thread::sleep(std::time::Duration::from_nanos(10000));
         // }
 
+        // TODO have problem，will push multiple chunks in on qp, this will cause Nak
         let count = self.pending_fragmenters.len();
         for _ in 0..count {
             if let Some(mut iter) = self.pending_fragmenters.pop_front() {
