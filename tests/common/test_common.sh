@@ -169,8 +169,11 @@ start_rtl_simulators_with_switch() {
 
 # 启动 RTL 模拟器
 # 参数:
-#   $1: num_instances - RTL 实例数量 (1 或 2)
-#   $2: test_name - 测试名称（用于日志文件命名和选择 make target）
+#   $1: num_instances - RTL 实例数量 (1 或 2)；pcie_loopback 模式固定为 1
+#   $2: test_name - 测试名称，决定日志文件名和 make target：
+#         "loopback"      - 单实例以太网回环 (mkBsvTopWithoutHardIpInstance)
+#         "pcie_loopback" - 单实例 PCIe 回环 (mkBsvTop，需要 sudo)
+#         其他            - 双实例 send/recv（server/client）
 # 返回:
 #   设置 RTL_PIDS 数组，包含所有启动的 RTL 进程 PID
 start_rtl_simulators() {
@@ -194,8 +197,12 @@ start_rtl_simulators() {
 
     echo "Current directory: $(pwd)"
 
-    # verilator 编译
-    make compile_verilator
+    # verilator 编译：PCIe 模式 DUT 是 mkBsvTop，其余使用默认 TOP_MODULE
+    if [ "$test_name" = "pcie_loopback" ]; then
+        make compile_verilator TOP_MODULE=mkBsvTop
+    else
+        make compile_verilator
+    fi
 
     # 清空 RTL_PIDS 数组
     RTL_PIDS=()
@@ -204,12 +211,19 @@ start_rtl_simulators() {
         # 启动单个 RTL 实例
         if [ "$test_name" = "loopback" ]; then
             make run_system_test_server_loopback > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
+        elif [ "$test_name" = "pcie_loopback" ]; then
+            # PCIe loopback 使用 mkBsvTop DUT，make target 内部含 sudo
+            make run_pcie_system_test > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
         else
             make run_system_test_server_1 > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
         fi
         RTL_PIDS+=($!)
         echo "RTL instance 1 PID: ${RTL_PIDS[0]}"
     elif [ "$num_instances" -eq 2 ]; then
+        if [ "$test_name" = "pcie_loopback" ]; then
+            echo "Error: pcie_loopback mode only supports 1 instance"
+            exit 1
+        fi
         # 启动两个 RTL 实例
         make run_system_test_server_1 > "$LOG_DIR/rtl-server.log" 2>&1 &
         RTL_PIDS+=($!)
@@ -377,9 +391,9 @@ cleanup_rtl_simulators() {
         done
     fi
 
-    # 方法2: 主动查找所有 RTL 相关进程（确保清理干净）
+    # 方法2: 主动查找所有 RTL 相关进程（确保清理干净，含 PCIe loopback testbench）
     echo "Searching for any remaining RTL processes..."
-    local rtl_pids=$(pgrep -f "tb_top_for_system_test" 2>/dev/null || true)
+    local rtl_pids=$(pgrep -f "tb_top_for_system_test\|tb_top_pcie_system_test" 2>/dev/null || true)
 
     if [ -n "$rtl_pids" ]; then
         for pid in $rtl_pids; do

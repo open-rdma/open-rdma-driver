@@ -28,7 +28,25 @@ git checkout dev
 
 **系统依赖**：
 ```bash
-sudo apt install iverilog verilator zlib1g-dev tcl8.6 libtcl8.6
+sudo apt install iverilog zlib1g-dev tcl8.6 libtcl8.6
+```
+
+从 GitHub 安装新版 Verilator（stable 分支）：
+```bash
+sudo apt install -y help2man
+git clone https://github.com/verilator/verilator
+cd verilator
+git checkout stable
+autoconf
+./configure
+make -j $(nproc)
+sudo make install
+cd ..
+```
+
+验证安装：
+```bash
+verilator --version
 ```
 
 **Python 依赖**：
@@ -60,7 +78,8 @@ python -m pip install "cocotb @ git+https://github.com/cocotb/cocotb@a18883468b7
 再安装与当前仿真环境配套的 Python 依赖：
 
 ```bash
-python -m pip install cocotb-test cocotbext-pcie cocotbext-axi scapy
+python -m pip install cocotb-test cocotbext-axi scapy
+python -m pip install "cocotbext-pcie @ git+https://github.com/open-rdma/cocotbext-pcie"
 ```
 
 可以用下面的命令检查安装结果：
@@ -73,7 +92,8 @@ cocotb-config --version
 
 **说明**：
 - 本文档使用 `cocotb` dev 版本，而不是 PyPI 上的稳定版 `1.9.2`
-- 当前实测可安装的配套组合包括 `cocotb-bus 0.3.0`、`cocotbext-axi 0.1.28`、`cocotbext-pcie 0.2.16`、`cocotb-test 0.2.6`
+- 当前实测可安装的配套组合包括 `cocotb-bus 0.3.0`、`cocotbext-axi 0.1.28`、`cocotb-test 0.2.6`
+- `cocotbext-pcie` 使用 open-rdma 特化版本：`https://github.com/open-rdma/cocotbext-pcie`
 - 如果环境里曾安装过 `cocotb==1.9.2` 或其他旧版本，建议先在新环境中重新安装，避免残留依赖影响仿真
 - 如果遇到 `VerilatedVpi::*` 编译错误或 `No GPI_USERS specified, exiting...`，请参考：[cocotb dev 环境中 GPI_USERS 与 Verilator 兼容性说明](./detail/cocotb-gpi-users-and-verilator-compat.md)
 
