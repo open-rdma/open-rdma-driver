@@ -89,7 +89,7 @@ build_rust_driver() {
     echo "Rust driver built successfully"
 
     # 编译 rdma-core
-    (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
+    # (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
 
     # 根据编译模式设置 LD_LIBRARY_PATH
     export LD_LIBRARY_PATH="$DTLD_DIR/target/$profile:$DTLD_DIR/rdma-core-55.0/build/lib"
@@ -113,6 +113,13 @@ start_soft_switch() {
     SOFT_SWITCH_PID=$!
 
     export SOFT_SWITCH_PID
+}
+
+ensure_sudo_session() {
+    if ! sudo -v; then
+        echo "Error: sudo authentication is required for PCIe RTL tests"
+        exit 1
+    fi
 }
 
 start_rtl_simulators_with_switch() {
@@ -197,9 +204,10 @@ start_rtl_simulators() {
 
     echo "Current directory: $(pwd)"
 
-    # verilator 编译：PCIe 模式 DUT 是 mkBsvTop，其余使用默认 TOP_MODULE
+    # verilator 编译：PCIe 模式 DUT 是 top_mkBsvTopWithResetBuffer，其余使用默认 TOP_MODULE
     if [ "$test_name" = "pcie_loopback" ]; then
-        make compile_verilator TOP_MODULE=mkBsvTop
+        ensure_sudo_session
+        make compile_verilator TOP_MODULE=top_mkBsvTopWithResetBuffer
     else
         make compile_verilator
     fi
@@ -356,6 +364,36 @@ wait_for_test_process() {
     handle_process_exit_status "$process_name" "$pid" "$exit_code" "$log_path"
 }
 
+# 检查进程是否存活；对于 sudo 启动的 RTL 进程，必要时使用 sudo 探测
+is_process_alive() {
+    local pid=$1
+    ps -p "$pid" > /dev/null 2>&1
+}
+
+# 获取进程组 ID
+get_process_group_id() {
+    local pid=$1
+    ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]'
+}
+
+# 向进程组或进程发送信号；对于 sudo 启动的 RTL 进程，必要时使用 sudo
+signal_process_or_group() {
+    local signal=$1
+    local pid=$2
+    local pgid
+
+    pgid=$(get_process_group_id "$pid")
+
+    if [ -n "$pgid" ]; then
+        kill "-$signal" -- "-$pgid" 2>/dev/null ||
+            sudo -n kill "-$signal" -- "-$pgid" 2>/dev/null ||
+            true
+    fi
+
+    kill "-$signal" "$pid" 2>/dev/null ||
+        sudo -n kill "-$signal" "$pid" 2>/dev/null
+}
+
 # 清理 RTL 模拟器进程
 # 先尝试 SIGTERM，如果不成功则使用 SIGKILL 强制终止
 # 同时清理所有子进程
@@ -372,19 +410,19 @@ cleanup_rtl_simulators() {
     # 方法1: 使用 RTL_PIDS 数组（如果存在）
     if [ ${#RTL_PIDS[@]} -gt 0 ]; then
         for pid in "${RTL_PIDS[@]}"; do
-            if kill -0 $pid 2>/dev/null; then
+            if is_process_alive "$pid"; then
                 echo "Terminating RTL process $pid (from RTL_PIDS)"
                 # 获取所有子进程
                 local children=$(pgrep -P $pid 2>/dev/null || true)
                 # 发送 SIGTERM 到进程组
-                kill -TERM -$pid 2>/dev/null || kill -TERM $pid 2>/dev/null
+                signal_process_or_group TERM "$pid"
                 # 等待最多 1 秒
                 sleep 1
                 # 强制终止
-                if kill -0 $pid 2>/dev/null; then
-                    kill -9 -$pid 2>/dev/null || kill -9 $pid 2>/dev/null
+                if is_process_alive "$pid"; then
+                    signal_process_or_group KILL "$pid"
                     for child in $children; do
-                        kill -9 $child 2>/dev/null || true
+                        signal_process_or_group KILL "$child" || true
                     done
                 fi
             fi
@@ -397,21 +435,21 @@ cleanup_rtl_simulators() {
 
     if [ -n "$rtl_pids" ]; then
         for pid in $rtl_pids; do
-            if kill -0 $pid 2>/dev/null; then
+            if is_process_alive "$pid"; then
                 echo "Found RTL process $pid, terminating..."
                 # 获取所有子进程（mkBsvTopW等）
                 local children=$(pgrep -P $pid 2>/dev/null || true)
                 # 终止进程组
-                kill -TERM -$pid 2>/dev/null || kill -TERM $pid 2>/dev/null
+                signal_process_or_group TERM "$pid"
                 # 等待 1 秒
                 sleep 1
                 # 强制清理
-                if kill -0 $pid 2>/dev/null; then
-                    kill -9 -$pid 2>/dev/null || kill -9 $pid 2>/dev/null
+                if is_process_alive "$pid"; then
+                    signal_process_or_group KILL "$pid"
                 fi
                 # 清理子进程
                 for child in $children; do
-                    kill -9 $child 2>/dev/null || true
+                    signal_process_or_group KILL "$child" || true
                 done
             fi
         done
@@ -421,17 +459,25 @@ cleanup_rtl_simulators() {
     local bsv_pids=$(pgrep -f "mkBsvTopWithoutHardIpInstance" 2>/dev/null || true)
     if [ -n "$bsv_pids" ]; then
         echo "Cleaning up mkBsvTopW processes: $bsv_pids"
-        kill -9 $bsv_pids 2>/dev/null || true
+        for pid in $bsv_pids; do
+            signal_process_or_group KILL "$pid" || true
+        done
     fi
+
+    # 方法4: PCIe loopback 通过 sudo + pipeline 启动，按命令行兜底清理
+    sudo -n pkill -TERM -f "python3 tb_top_pcie_system_test.py" 2>/dev/null || true
+    sudo -n pkill -KILL -f "python3 tb_top_pcie_system_test.py" 2>/dev/null || true
+    sudo -n pkill -TERM -f "sudo env .*tb_top_pcie_system_test.py" 2>/dev/null || true
+    sudo -n pkill -KILL -f "sudo env .*tb_top_pcie_system_test.py" 2>/dev/null || true
     
     # 清理软交换机进程
     if [ -n "$SOFT_SWITCH_PID" ]; then
-        if kill -0 $SOFT_SWITCH_PID 2>/dev/null; then
+        if is_process_alive "$SOFT_SWITCH_PID"; then
             echo "Terminating soft switch simulator (PID: $SOFT_SWITCH_PID)"
-            kill -TERM $SOFT_SWITCH_PID 2>/dev/null
+            signal_process_or_group TERM "$SOFT_SWITCH_PID"
             sleep 1
-            if kill -0 $SOFT_SWITCH_PID 2>/dev/null; then
-                kill -9 $SOFT_SWITCH_PID 2>/dev/null
+            if is_process_alive "$SOFT_SWITCH_PID"; then
+                signal_process_or_group KILL "$SOFT_SWITCH_PID"
             fi
         fi
     fi
