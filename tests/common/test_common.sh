@@ -89,7 +89,8 @@ build_rust_driver() {
     echo "Rust driver built successfully"
 
     # 编译 rdma-core
-    # (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
+    # TODO 这一点耗时较长，后续需要进行优化
+    (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
 
     # 根据编译模式设置 LD_LIBRARY_PATH
     export LD_LIBRARY_PATH="$DTLD_DIR/target/$profile:$DTLD_DIR/rdma-core-55.0/build/lib"
