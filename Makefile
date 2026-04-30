@@ -3,6 +3,9 @@ KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
 BUILD_DIR := build
 BLUERDMA_SRC_DIR := kernel-driver
 UDMABUF_SRC_DIR := third_party/udmabuf
+RDMA_CORE_DIR := dtld-ibverbs/rdma-core-55.0
+RDMA_CORE_LIB := $(RDMA_CORE_DIR)/build/lib/libibverbs.so.1
+RDMA_CORE_PROVIDER := $(RDMA_CORE_DIR)/build/lib/libbluerdma-rdmav34.so
 
 BLUERDMA_KO := bluerdma.ko
 UDMABUF_KO := u-dma-buf.ko
@@ -10,7 +13,7 @@ UDMABUF_SIZE ?= 2097152
 UDMABUF_PARAMS := udmabuf0=$(UDMABUF_SIZE) udmabuf1=$(UDMABUF_SIZE) udmabuf2=$(UDMABUF_SIZE) udmabuf3=$(UDMABUF_SIZE)
 
 # Phony targets
-.PHONY: all clean install uninstall modules bluerdma udmabuf help
+.PHONY: all clean install uninstall modules bluerdma udmabuf rdma-core rdma-core-force help
 
 # Default target
 all: modules
@@ -21,6 +24,8 @@ help:
 	@echo "  modules        - Same as 'all'"
 	@echo "  bluerdma       - Build only bluerdma module"
 	@echo "  udmabuf        - Build only udmabuf module"
+	@echo "  rdma-core      - Build rdma-core/provider if outputs are missing"
+	@echo "  rdma-core-force - Force rebuild rdma-core/provider"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  install        - Load modules (requires root privileges)"
 	@echo "  uninstall      - Unload modules (requires root privileges)"
@@ -34,6 +39,14 @@ $(BUILD_DIR):
 	mkdir -p $@
 
 modules: bluerdma udmabuf
+
+rdma-core: $(RDMA_CORE_LIB) $(RDMA_CORE_PROVIDER)
+
+$(RDMA_CORE_LIB) $(RDMA_CORE_PROVIDER):
+	cd $(RDMA_CORE_DIR) && ./build.sh
+
+rdma-core-force:
+	cd $(RDMA_CORE_DIR) && ./build.sh
 
 bluerdma: $(BUILD_DIR)
 	$(MAKE) -C $(KERNEL_SRC) M=$(CURDIR)/$(BLUERDMA_SRC_DIR) modules

@@ -88,9 +88,8 @@ build_rust_driver() {
 
     echo "Rust driver built successfully"
 
-    # 编译 rdma-core
-    # TODO 这一点耗时较长，后续需要进行优化
-    (cd "$DTLD_DIR/rdma-core-55.0/" && ./build.sh)
+    # 编译 rdma-core/provider；如果目标产物已存在，根 Makefile 会自动跳过
+    (cd "$DRIVER_DIR" && make rdma-core)
 
     # 根据编译模式设置 LD_LIBRARY_PATH
     export LD_LIBRARY_PATH="$DTLD_DIR/target/$profile:$DTLD_DIR/rdma-core-55.0/build/lib"
@@ -206,12 +205,12 @@ start_rtl_simulators() {
     echo "Current directory: $(pwd)"
 
     # verilator 编译：PCIe 模式 DUT 是 top_mkBsvTopWithResetBuffer，其余使用默认 TOP_MODULE
-    if [ "$test_name" = "pcie_loopback" ]; then
-        ensure_sudo_session
-        make compile_verilator TOP_MODULE=top_mkBsvTopWithResetBuffer
-    else
-        make compile_verilator
-    fi
+    # if [ "$test_name" = "pcie_loopback" ]; then
+    #     ensure_sudo_session
+    #     make compile_verilator TOP_MODULE=top_mkBsvTopWithResetBuffer
+    # else
+    #     make compile_verilator
+    # fi
 
     # 清空 RTL_PIDS 数组
     RTL_PIDS=()
