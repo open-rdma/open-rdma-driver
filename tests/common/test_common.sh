@@ -370,28 +370,44 @@ is_process_alive() {
     ps -p "$pid" > /dev/null 2>&1
 }
 
-# 获取进程组 ID
-get_process_group_id() {
+# 递归获取指定 PID 的所有子孙进程
+get_descendant_pids() {
     local pid=$1
-    ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]'
+    local children
+    local child
+
+    children=$(pgrep -P "$pid" 2>/dev/null || sudo -n pgrep -P "$pid" 2>/dev/null || true)
+
+    for child in $children; do
+        echo "$child"
+        get_descendant_pids "$child"
+    done
 }
 
-# 向进程组或进程发送信号；对于 sudo 启动的 RTL 进程，必要时使用 sudo
+# 向进程树发送信号；优先按父子树清理，避免误伤共用进程组的外层 shell
 signal_process_or_group() {
     local signal=$1
     local pid=$2
-    local pgid
+    local descendants=()
+    local child_pid
+    local i
 
-    pgid=$(get_process_group_id "$pid")
+    while IFS= read -r child_pid; do
+        if [ -n "$child_pid" ]; then
+            descendants+=("$child_pid")
+        fi
+    done < <(get_descendant_pids "$pid")
 
-    if [ -n "$pgid" ]; then
-        kill "-$signal" -- "-$pgid" 2>/dev/null ||
-            sudo -n kill "-$signal" -- "-$pgid" 2>/dev/null ||
+    # 先从叶子节点开始发信号，确保 make/sh/python/tee 这类包装链条整体退出。
+    for ((i=${#descendants[@]}-1; i>=0; i--)); do
+        kill "-$signal" "${descendants[$i]}" 2>/dev/null ||
+            sudo -n kill "-$signal" "${descendants[$i]}" 2>/dev/null ||
             true
-    fi
+    done
 
     kill "-$signal" "$pid" 2>/dev/null ||
-        sudo -n kill "-$signal" "$pid" 2>/dev/null
+        sudo -n kill "-$signal" "$pid" 2>/dev/null ||
+        true
 }
 
 # 清理 RTL 模拟器进程
@@ -399,88 +415,95 @@ signal_process_or_group() {
 # 同时清理所有子进程
 # TODO 需要进一步优化
 cleanup_rtl_simulators() {
-    echo "========================================" >&2
-    echo "CLEANUP CALLED at $(date)" >&2
-    echo "RTL_PIDS array length: ${#RTL_PIDS[@]}" >&2
-    echo "RTL_PIDS contents: ${RTL_PIDS[@]}" >&2
-    echo "========================================" >&2
-
     echo "Cleaning up RTL simulators..."
+    local need_fallback_pkill=0
 
-    # 方法1: 使用 RTL_PIDS 数组（如果存在）
+    cleanup_recorded_process() {
+        local pid=$1
+        local label=$2
+        local descendants_before=()
+        local descendant_pid
+        local survivor_found=0
+
+        while IFS= read -r descendant_pid; do
+            if [ -n "$descendant_pid" ]; then
+                descendants_before+=("$descendant_pid")
+            fi
+        done < <(get_descendant_pids "$pid")
+
+        if ! is_process_alive "$pid" && [ ${#descendants_before[@]} -eq 0 ]; then
+            return 0
+        fi
+
+        echo "Terminating $label (PID: $pid)"
+        signal_process_or_group TERM "$pid"
+        sleep 1
+
+        if is_process_alive "$pid"; then
+            echo "Force killing $label (PID: $pid)"
+            signal_process_or_group KILL "$pid"
+            sleep 0.2
+        fi
+
+        if is_process_alive "$pid"; then
+            echo "Warning: $label still alive after direct cleanup (PID: $pid)" >&2
+            need_fallback_pkill=1
+            survivor_found=1
+        fi
+
+        for descendant_pid in "${descendants_before[@]}"; do
+            if is_process_alive "$descendant_pid"; then
+                echo "Warning: $label child still alive after cleanup (PID: $descendant_pid)" >&2
+                need_fallback_pkill=1
+                survivor_found=1
+            fi
+        done
+
+        if [ "$survivor_found" -eq 1 ]; then
+            echo "Falling back to command-line cleanup for $label" >&2
+        fi
+    }
+
+    # 主路径：只清理由当前测试脚本启动并记录下来的进程。
     if [ ${#RTL_PIDS[@]} -gt 0 ]; then
         for pid in "${RTL_PIDS[@]}"; do
-            if is_process_alive "$pid"; then
-                echo "Terminating RTL process $pid (from RTL_PIDS)"
-                # 获取所有子进程
-                local children=$(pgrep -P $pid 2>/dev/null || true)
-                # 发送 SIGTERM 到进程组
-                signal_process_or_group TERM "$pid"
-                # 等待最多 1 秒
-                sleep 1
-                # 强制终止
-                if is_process_alive "$pid"; then
-                    signal_process_or_group KILL "$pid"
-                    for child in $children; do
-                        signal_process_or_group KILL "$child" || true
-                    done
-                fi
-            fi
+            cleanup_recorded_process "$pid" "RTL simulator"
         done
     fi
 
-    # 方法2: 主动查找所有 RTL 相关进程（确保清理干净，含 PCIe loopback testbench）
-    echo "Searching for any remaining RTL processes..."
-    local rtl_pids=$(pgrep -f "tb_top_for_system_test\|tb_top_pcie_system_test" 2>/dev/null || true)
-
-    if [ -n "$rtl_pids" ]; then
-        for pid in $rtl_pids; do
-            if is_process_alive "$pid"; then
-                echo "Found RTL process $pid, terminating..."
-                # 获取所有子进程（mkBsvTopW等）
-                local children=$(pgrep -P $pid 2>/dev/null || true)
-                # 终止进程组
-                signal_process_or_group TERM "$pid"
-                # 等待 1 秒
-                sleep 1
-                # 强制清理
-                if is_process_alive "$pid"; then
-                    signal_process_or_group KILL "$pid"
-                fi
-                # 清理子进程
-                for child in $children; do
-                    signal_process_or_group KILL "$child" || true
-                done
-            fi
-        done
-    fi
-
-    # 方法3: 清理可能残留的 mkBsvTopW 进程
-    local bsv_pids=$(pgrep -f "mkBsvTopWithoutHardIpInstance" 2>/dev/null || true)
-    if [ -n "$bsv_pids" ]; then
-        echo "Cleaning up mkBsvTopW processes: $bsv_pids"
-        for pid in $bsv_pids; do
-            signal_process_or_group KILL "$pid" || true
-        done
-    fi
-
-    # 方法4: PCIe loopback 通过 sudo + pipeline 启动，按命令行兜底清理
-    sudo -n pkill -TERM -f "python3 tb_top_pcie_system_test.py" 2>/dev/null || true
-    sudo -n pkill -KILL -f "python3 tb_top_pcie_system_test.py" 2>/dev/null || true
-    sudo -n pkill -TERM -f "sudo env .*tb_top_pcie_system_test.py" 2>/dev/null || true
-    sudo -n pkill -KILL -f "sudo env .*tb_top_pcie_system_test.py" 2>/dev/null || true
-    
-    # 清理软交换机进程
     if [ -n "$SOFT_SWITCH_PID" ]; then
-        if is_process_alive "$SOFT_SWITCH_PID"; then
-            echo "Terminating soft switch simulator (PID: $SOFT_SWITCH_PID)"
-            signal_process_or_group TERM "$SOFT_SWITCH_PID"
-            sleep 1
-            if is_process_alive "$SOFT_SWITCH_PID"; then
-                signal_process_or_group KILL "$SOFT_SWITCH_PID"
+        cleanup_recorded_process "$SOFT_SWITCH_PID" "soft switch simulator"
+    fi
+
+    # 兜底路径：只按 testbench 的 Python 入口清理残留。
+    # 兼容 python / python3，避免误杀 sim_build 可执行文件或 tee，导致终端链路异常。
+    local fallback_pattern="python(3)? tb_top_for_system_test.py|python(3)? tb_top_for_system_test_two_card.py|python(3)? tb_top_for_system_test_multi_node.py|python(3)? tb_top_pcie_system_test.py"
+
+    if [ "$need_fallback_pkill" -eq 1 ] || \
+       { pgrep -f "$fallback_pattern" >/dev/null 2>&1 || sudo -n pgrep -f "$fallback_pattern" >/dev/null 2>&1; }; then
+        echo "Cleaning up remaining RTL processes by command line match..."
+        local attempt
+
+        for attempt in 1 2 3; do
+            pkill -TERM -f "$fallback_pattern" 2>/dev/null || true
+            sudo -n pkill -TERM -f "$fallback_pattern" 2>/dev/null || true
+            sleep 0.2
+
+            if ! pgrep -f "$fallback_pattern" >/dev/null 2>&1 && \
+               ! sudo -n pgrep -f "$fallback_pattern" >/dev/null 2>&1; then
+                break
             fi
+        done
+
+        if pgrep -f "$fallback_pattern" >/dev/null 2>&1 || sudo -n pgrep -f "$fallback_pattern" >/dev/null 2>&1; then
+            pkill -KILL -f "$fallback_pattern" 2>/dev/null || true
+            sudo -n pkill -KILL -f "$fallback_pattern" 2>/dev/null || true
+            sleep 0.2
         fi
     fi
+
+    RTL_PIDS=()
+    SOFT_SWITCH_PID=
 
     echo "RTL simulators cleanup completed"
 }
