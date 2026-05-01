@@ -40,6 +40,9 @@ init_test_environment
 # 编译 Rust 驱动（同时设置 LD_LIBRARY_PATH）
 build_rust_driver "sim"
 
+# 前置编译普通 SIM flow 的 BSV/Verilog
+build_rtl_verilog_for_test "default"
+
 # 启动 soft switch 模拟器
 start_soft_switch
 

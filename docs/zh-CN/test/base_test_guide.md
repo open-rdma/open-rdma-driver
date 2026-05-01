@@ -39,38 +39,23 @@ base test 的主要入口在：
 export RTL_DIR=/path/to/open-rdma-rtl
 ```
 
-### 2. 普通 SIM 测试所需 RTL 已生成
+### 2. RTL 编译工具链可用
 
-普通 base test 使用的 DUT 是：
+一键脚本现在会在启动 RTL 仿真器之前，自动调用 `open-rdma-rtl/test/cocotb/Makefile` 的 `verilog` 目标来前置编译 BSV/Verilog。
 
-- `mkBsvTopWithoutHardIpInstance`
-
-对应的 Verilog 需要先在 `open-rdma-rtl/test/cocotb/` 下生成：
+因此运行前不再要求手工执行：
 
 ```bash
-cd /path/to/open-rdma-rtl/test/cocotb
 make verilog
 ```
 
-这一步会在 `open-rdma-rtl/backend/verilog/` 下生成 `mkBsvTopWithoutHardIpInstance.v` 及相关依赖。
+但仍需保证以下工具链可用：
 
-### 3. `loopback_pcie` 需要单独生成不同的 TOP
+- `bsc` / `bluetcl`
+- Python cocotb 依赖
+- 选定的仿真器（如 `iverilog`、`verilator`）
 
-`loopback_pcie` 不使用普通 SIM 测试的 `mkBsvTopWithoutHardIpInstance`，而是需要 PCIe 相关 top。
-
-在运行这类测试前，需要先生成：
-
-```bash
-cd /path/to/open-rdma-rtl/test/cocotb
-make verilog TOP_MODULE=mkBsvTop
-```
-
-也就是说：
-
-- 普通测试：`make verilog`
-- `loopback_pcie`：`make verilog TOP_MODULE=mkBsvTop`
-
-如果没有提前生成对应 top，后续脚本虽然会尝试启动 cocotb/Verilator，但可能因为顶层 Verilog 不存在或与当前测试模式不匹配而失败。
+脚本每次都会触发一次 `verilog` 目标；是否真正重编由 `open-rdma-rtl/backend` 的 cache/stamp 机制决定。
 
 ## 如何通过脚本运行
 
@@ -118,9 +103,10 @@ cd /path/to/open-rdma-driver/tests/base_test/scripts
 
 1. 初始化测试环境
 2. 编译 Rust 驱动（`sim` feature）
-3. 启动 RTL 仿真器
-4. 编译 base test 可执行程序
-5. 启动测试程序并等待结束
+3. 前置编译 RTL 的 BSV/Verilog
+4. 启动 RTL 仿真器
+5. 编译 base test 可执行程序
+6. 启动测试程序并等待结束
 
 RTL 启动逻辑在：
 
@@ -131,6 +117,12 @@ RTL 启动逻辑在：
 - 普通单实例 loopback 会调用 `make run_system_test_server_loopback`
 - 双实例测试会调用 `make run_system_test_server_1` / `make run_system_test_server_2`
 - PCIe loopback 会调用 `make run_pcie_system_test`
+
+对于 PCIe loopback：
+
+- 会使用 `FLOW=pcie`
+- 会编译 `mkBsvTop` + `top_mkBsvTopWithResetBuffer`
+- `BLUERDMA_IMMFAIL_ENABLE_TIME` 由 cocotb `Makefile` 内部固定配置，不依赖外部环境变量
 
 ## 日志位置
 
@@ -169,24 +161,18 @@ make: 'verilog' is up to date.
 
 ### 2. 脚本能启动，但找不到正确的 DUT
 
-优先检查是否提前生成了正确的顶层：
+优先检查脚本日志中的 RTL 前置编译阶段是否成功：
 
-- 普通测试：`make verilog`
-- `loopback_pcie`：`make verilog TOP_MODULE=mkBsvTop`
+- 普通测试应走 `FLOW=default`
+- `loopback_pcie` 应走 `FLOW=pcie`
+- 若 PCIe 侧 reset 时序有变化，需要同步检查 cocotb `Makefile` 中固定的 `BLUERDMA_IMMFAIL_ENABLE_TIME`
 
 ## 推荐执行顺序
 
 首次运行一套 base test 时，建议按下面顺序准备：
 
 ```bash
-# 1. 生成普通 SIM RTL
-cd /path/to/open-rdma-rtl/test/cocotb
-make verilog
-
-# 2. 如需运行 loopback_pcie，再额外生成 PCIe top
-make verilog TOP_MODULE=mkBsvTop
-
-# 3. 回到脚本目录运行测试
+# 1. 回到脚本目录运行测试
 cd /path/to/open-rdma-driver/tests/base_test/scripts
 ./test_loopback_sim.sh 4096
 ```

@@ -122,6 +122,34 @@ ensure_sudo_session() {
     fi
 }
 
+# 前置编译 RTL Verilog。
+# 参数:
+#   $1: flow - "default" 或 "pcie"
+build_rtl_verilog_for_test() {
+    local flow=${1:-"default"}
+
+    if [ -z "$RTL_DIR" ]; then
+        echo "Error: RTL_DIR not set. Call init_test_environment first."
+        exit 1
+    fi
+
+    local rtl_cocotb_dir="$RTL_DIR/test/cocotb"
+
+    echo "Building RTL Verilog for flow: $flow"
+    cd "$rtl_cocotb_dir"
+
+    if [ "$flow" = "pcie" ]; then
+        make FLOW=pcie verilog
+    else
+        make FLOW=default verilog
+    fi
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to build RTL Verilog for flow: $flow"
+        exit 1
+    fi
+}
+
 start_rtl_simulators_with_switch() {
     local num_instances=$1
     local test_name=${2:-"test"}
@@ -143,14 +171,11 @@ start_rtl_simulators_with_switch() {
 
     echo "Current directory: $(pwd)"
 
-    # verilator 编译
-    make compile_verilator
-
     # 清空 RTL_PIDS 数组
     RTL_PIDS=()
 
     for i in $(seq 1 $num_instances); do
-        make INST_ID=$i run_system_test_multi_node > "$LOG_DIR/rtl-$test_name-$i.log" 2>&1 &
+        make FLOW=default INST_ID=$i run_system_test_multi_node > "$LOG_DIR/rtl-$test_name-$i.log" 2>&1 &
         RTL_PIDS+=($!)
         echo "RTL instance $i PID: ${RTL_PIDS[$((i-1))]}"
     done
@@ -204,26 +229,18 @@ start_rtl_simulators() {
 
     echo "Current directory: $(pwd)"
 
-    # verilator 编译：PCIe 模式 DUT 是 top_mkBsvTopWithResetBuffer，其余使用默认 TOP_MODULE
-    # if [ "$test_name" = "pcie_loopback" ]; then
-    #     ensure_sudo_session
-    #     make compile_verilator TOP_MODULE=top_mkBsvTopWithResetBuffer
-    # else
-    #     make compile_verilator
-    # fi
-
     # 清空 RTL_PIDS 数组
     RTL_PIDS=()
 
     if [ "$num_instances" -eq 1 ]; then
         # 启动单个 RTL 实例
         if [ "$test_name" = "loopback" ]; then
-            make run_system_test_server_loopback > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
+            make FLOW=default run_system_test_server_loopback > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
         elif [ "$test_name" = "pcie_loopback" ]; then
             # PCIe loopback 使用 mkBsvTop DUT，make target 内部含 sudo
-            make run_pcie_system_test > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
+            make FLOW=pcie run_pcie_system_test > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
         else
-            make run_system_test_server_1 > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
+            make FLOW=default run_system_test_server_1 > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
         fi
         RTL_PIDS+=($!)
         echo "RTL instance 1 PID: ${RTL_PIDS[0]}"
@@ -233,11 +250,11 @@ start_rtl_simulators() {
             exit 1
         fi
         # 启动两个 RTL 实例
-        make run_system_test_server_1 > "$LOG_DIR/rtl-server.log" 2>&1 &
+        make FLOW=default run_system_test_server_1 > "$LOG_DIR/rtl-server.log" 2>&1 &
         RTL_PIDS+=($!)
         echo "RTL instance 1 PID: ${RTL_PIDS[0]}"
 
-        make run_system_test_server_2 > "$LOG_DIR/rtl-client.log" 2>&1 &
+        make FLOW=default run_system_test_server_2 > "$LOG_DIR/rtl-client.log" 2>&1 &
         RTL_PIDS+=($!)
         echo "RTL instance 2 PID: ${RTL_PIDS[1]}"
     else
