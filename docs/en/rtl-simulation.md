@@ -2,6 +2,13 @@
 
 > **Note**: This document describes the standalone `open-rdma-rtl` hardware simulation project, which lives in a separate repository from `open-rdma-driver`.
 
+If you reached this page from the `open-rdma-driver` installation or test documentation, you may also want to read:
+
+- [Driver installation and usage guide](./installation.md)
+- [Base Test Script Guide](./test/base_test_guide.md)
+
+For lower-level RTL simulation details such as cocotb, BSV compilation, and RTL simulator startup flow, the scripts and documentation in the `open-rdma-rtl` repository are the source of truth.
+
 ## Installation Steps
 
 ### 1. Clone the Project

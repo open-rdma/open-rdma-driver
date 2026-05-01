@@ -2,6 +2,11 @@
 
 本文档提供 Open RDMA Driver 的快速安装步骤。详细技术细节和故障排除请参考 [detail](./detail/) 文件夹中的文档。
 
+如果你当前关注的是 RTL 仿真或 driver 侧一键测试入口，建议同时阅读：
+
+- [RTL 仿真说明](./rtl-simulation.md)
+- [base_test 脚本运行指南](./test/base_test_guide.md)
+
 ## 环境要求
 
 - Linux 系统（支持 WSL2）
@@ -122,9 +127,11 @@ cd dtld-ibverbs
 cargo build --no-default-features --features sim
 cd ..
 ```
-- 需要先启动 RTL 仿真器（achronix-400g 项目的仿真器）
+- 需要先启动 RTL 仿真器（open-rdma-rtl 项目的仿真器）
 - 用于硬件逻辑验证
-- 在运行测试前必须在单独的终端启动仿真器（参见 achronix-400g 项目文档）
+- 推荐先阅读本仓库的 [RTL 仿真说明](./rtl-simulation.md)，再根据其中链接进入 `open-rdma-rtl` 项目文档
+- 如果希望直接使用 driver 侧自动化脚本运行 sim 测试，另请参考 [base_test 脚本运行指南](./test/base_test_guide.md)
+- 在运行测试前必须在单独的终端启动仿真器（参见 open-rdma-rtl 项目文档）
 
 **硬件模式（hw）**：
 
@@ -307,15 +314,15 @@ make
 
 **单端回环测试（loopback）**：
 ```bash
-# 1. 先在单独的终端启动仿真器（在 achronix-400g 项目中）
-# 具体启动命令请参见 achronix-400g 项目的文档
+# 1. 先在单独的终端启动仿真器（在 open-rdma-rtl 项目中）
+# 具体启动命令请参见 open-rdma-rtl 项目的文档
 
 # 2. 在 open-rdma-driver/examples 目录下运行测试
 ./loopback 8192
 ```
 
 **双端测试（send_recv）**：
-需要分别启动两个不同的仿真器实例（参见 achronix-400g 项目文档），然后运行：
+需要分别启动两个不同的仿真器实例（参见 open-rdma-rtl 项目文档），然后运行：
 
 **终端 3（在 open-rdma-driver/examples 目录下运行）**：
 ```bash
@@ -450,5 +457,3 @@ cd .. && git clone https://github.com/open-rdma/open-rdma-rtl.git
 - [切换到 vanilla RDMA](./detail/switch-to-vanilla-rdma.md)
 - [自动化测试框架说明](../../tests/base_test/README.md)
 - [测试脚本使用指南](../../tests/base_test/scripts/README.md)
-
-

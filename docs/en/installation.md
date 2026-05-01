@@ -2,6 +2,11 @@
 
 This document provides quick installation steps for the Open RDMA Driver. For detailed technical information and troubleshooting, refer to the documents in the [detail](./detail/) folder.
 
+If you are currently looking for RTL simulation setup or driver-side one-click test entrypoints, read these alongside this guide:
+
+- [RTL Simulation Guide](./rtl-simulation.md)
+- [Base Test Script Guide](./test/base_test_guide.md)
+
 ## Requirements
 
 - Linux system (WSL2 supported)
@@ -120,9 +125,11 @@ cd dtld-ibverbs
 cargo build --no-default-features --features sim
 cd ..
 ```
-- Requires the RTL simulator to be started first (the simulator from the achronix-400g project)
+- Requires the RTL simulator to be started first (the simulator from the open-rdma-rtl project)
 - Used for hardware logic verification
-- The simulator must be started in a separate terminal before running tests (see achronix-400g project documentation)
+- Recommended reading: [RTL Simulation Guide](./rtl-simulation.md), then follow its links into the `open-rdma-rtl` repository documentation
+- If you want to run driver-side automated sim tests directly, also refer to the [Base Test Script Guide](./test/base_test_guide.md)
+- The simulator must be started in a separate terminal before running tests (see the open-rdma-rtl project documentation)
 
 **Hardware mode (hw)**:
 
@@ -305,15 +312,15 @@ Run according to the mode selected at build time:
 
 **Single-node loopback test**:
 ```bash
-# 1. First start the simulator in a separate terminal (in the achronix-400g project)
-# See the achronix-400g project documentation for the specific start command
+# 1. First start the simulator in a separate terminal (in the open-rdma-rtl project)
+# See the open-rdma-rtl project documentation for the specific start command
 
 # 2. Run the test from open-rdma-driver/examples
 ./loopback 8192
 ```
 
 **Two-node test (send_recv)**:
-Requires starting two separate simulator instances (see achronix-400g project documentation), then run:
+Requires starting two separate simulator instances (see the open-rdma-rtl project documentation), then run:
 
 **Terminal 3 (run from open-rdma-driver/examples directory)**:
 ```bash

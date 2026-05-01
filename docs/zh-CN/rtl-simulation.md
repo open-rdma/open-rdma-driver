@@ -2,6 +2,13 @@
 
 > **注意**：本文档描述的是独立的 `open-rdma-rtl` 硬件仿真项目，与 `open-rdma-driver` 项目位于不同仓库。
 
+如果你当前是从 `open-rdma-driver` 的安装或测试文档跳转过来的，可以配合阅读：
+
+- Driver 侧安装与使用说明：[installation.md](./installation.md)
+- Driver 一键测试说明：[base_test 脚本运行指南](./test/base_test_guide.md)
+
+关于 cocotb、BSV 编译、RTL 仿真器启动方式等更底层的 RTL 仿真细节，应以 `open-rdma-rtl` 仓库中的脚本和文档为准。
+
 ## 安装步骤
 
 ### 1. 克隆项目
