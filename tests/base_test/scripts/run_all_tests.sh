@@ -62,19 +62,22 @@ echo ""
 # 1. Loopback 测试（单端，不需要 server/client）
 run_test "Loopback (4KB)" test_loopback_sim.sh 4096
 
-# 2. Send/Recv 测试
+# 2. PCIe Loopback 测试（单端）
+run_test "PCIe Loopback (4KB)" test_pcie_loopback_sim.sh 4096
+
+# 3. Send/Recv 测试
 run_test "Send/Recv (4KB)" test_send_recv_sim.sh 4096
 
-# 3. RDMA WRITE 测试
+# 4. RDMA WRITE 测试
 run_test "RDMA WRITE (4KB, 5 rounds)" test_rdma_write_sim.sh 4096 5
 
-# 4. WRITE with Immediate 测试
+# 5. WRITE with Immediate 测试
 run_test "WRITE with IMM (4KB)" test_write_imm_sim.sh 4096
 
-# 5. WRITE with Immediate 单次测试（零长度）
+# 6. WRITE with Immediate 单次测试（零长度）
 run_test "WRITE with IMM Single (zero-length)" test_write_imm_sim.sh 0
 
-# 6. WRITE with Immediate 单次测试（4KB）
+# 7. WRITE with Immediate 单次测试（4KB）
 run_test "WRITE with IMM Single (4KB)" test_write_imm_sim.sh 4096
 
 # 打印测试总结
