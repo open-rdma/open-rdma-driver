@@ -55,6 +55,19 @@ make verilog
 - Python cocotb 依赖
 - 选定的仿真器（如 `iverilog`、`verilator`）
 
+可以通过环境变量 `BLUERDMA_SIM_BACKEND` 指定 cocotb 使用的仿真后端，支持：
+
+- `iverilog`
+- `verilator`
+
+例如：
+
+```bash
+BLUERDMA_SIM_BACKEND=iverilog ./test_loopback_sim.sh 4096
+```
+
+如果未显式设置，默认仿真后端为 `verilator`。
+
 脚本每次都会触发一次 `verilog` 目标；是否真正重编由 `open-rdma-rtl/backend` 的 cache/stamp 机制决定。
 
 ## 如何通过脚本运行

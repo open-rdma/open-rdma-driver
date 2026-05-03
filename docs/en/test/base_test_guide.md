@@ -57,6 +57,21 @@ However, the following toolchain components must still be available:
 - Python cocotb dependencies
 - The selected simulator (such as `iverilog` or `verilator`)
 
+You can use the `BLUERDMA_SIM_BACKEND` environment variable to select the
+cocotb simulation backend. Supported values are:
+
+- `iverilog`
+- `verilator`
+
+For example:
+
+```bash
+BLUERDMA_SIM_BACKEND=iverilog ./test_loopback_sim.sh 4096
+```
+
+If this variable is not set explicitly, the default simulation backend is
+`verilator`.
+
 Each script run triggers the `verilog` target once; whether a real rebuild happens is decided by the cache/stamp mechanism in `open-rdma-rtl/backend`.
 
 ## Running the Scripts
