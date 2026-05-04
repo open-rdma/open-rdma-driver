@@ -150,6 +150,50 @@ build_rtl_verilog_for_test() {
     fi
 }
 
+resolve_rtl_flow() {
+    local test_name=${1:-"test"}
+
+    case "$test_name" in
+        pcie_loopback)
+            echo "pcie"
+            ;;
+        *)
+            echo "default"
+            ;;
+    esac
+}
+
+resolve_single_instance_rtl_target() {
+    local test_name=${1:-"test"}
+
+    case "$test_name" in
+        loopback)
+            echo "run_system_test_server_loopback"
+            ;;
+        pcie_loopback)
+            echo "run_pcie_system_test"
+            ;;
+        *)
+            echo "run_system_test_server_1"
+            ;;
+    esac
+}
+
+compile_verilator_for_test() {
+    local test_name=${1:-"test"}
+    local flow
+    flow=$(resolve_rtl_flow "$test_name")
+    local compile_log="$LOG_DIR/compile_verilator-$test_name.log"
+
+    echo "Compiling Verilator before starting RTL simulators..."
+    make FLOW="$flow" compile_verilator > "$compile_log" 2>&1
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to compile Verilator for flow: $flow. See log: $compile_log"
+        exit 1
+    fi
+    echo "Verilator compile log: $compile_log"
+}
+
 start_rtl_simulators_with_switch() {
     local num_instances=$1
     local test_name=${2:-"test"}
@@ -170,6 +214,8 @@ start_rtl_simulators_with_switch() {
     cd "$rtl_cocotb_dir"
 
     echo "Current directory: $(pwd)"
+
+    compile_verilator_for_test "$test_name"
 
     # 清空 RTL_PIDS 数组
     RTL_PIDS=()
@@ -229,32 +275,33 @@ start_rtl_simulators() {
 
     echo "Current directory: $(pwd)"
 
+    local flow
+    flow=$(resolve_rtl_flow "$test_name")
+
+    compile_verilator_for_test "$test_name"
+
     # 清空 RTL_PIDS 数组
     RTL_PIDS=()
 
     if [ "$num_instances" -eq 1 ]; then
+        local target
+        target=$(resolve_single_instance_rtl_target "$test_name")
+
         # 启动单个 RTL 实例
-        if [ "$test_name" = "loopback" ]; then
-            make FLOW=default run_system_test_server_loopback > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
-        elif [ "$test_name" = "pcie_loopback" ]; then
-            # PCIe loopback 使用 mkBsvTop DUT，make target 内部含 sudo
-            make FLOW=pcie run_pcie_system_test > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
-        else
-            make FLOW=default run_system_test_server_1 > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
-        fi
+        make FLOW="$flow" "$target" > "$LOG_DIR/rtl-$test_name.log" 2>&1 &
         RTL_PIDS+=($!)
         echo "RTL instance 1 PID: ${RTL_PIDS[0]}"
     elif [ "$num_instances" -eq 2 ]; then
-        if [ "$test_name" = "pcie_loopback" ]; then
-            echo "Error: pcie_loopback mode only supports 1 instance"
+        if [ "$flow" != "default" ]; then
+            echo "Error: test '$test_name' with flow '$flow' only supports 1 instance"
             exit 1
         fi
         # 启动两个 RTL 实例
-        make FLOW=default run_system_test_server_1 > "$LOG_DIR/rtl-server.log" 2>&1 &
+        make FLOW="$flow" run_system_test_server_1 > "$LOG_DIR/rtl-server.log" 2>&1 &
         RTL_PIDS+=($!)
         echo "RTL instance 1 PID: ${RTL_PIDS[0]}"
 
-        make FLOW=default run_system_test_server_2 > "$LOG_DIR/rtl-client.log" 2>&1 &
+        make FLOW="$flow" run_system_test_server_2 > "$LOG_DIR/rtl-client.log" 2>&1 &
         RTL_PIDS+=($!)
         echo "RTL instance 2 PID: ${RTL_PIDS[1]}"
     else

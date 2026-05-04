@@ -22,7 +22,7 @@ shift  # 移除第一个参数，剩余参数将传递给测试程序
 # 设置目录路径
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 DRIVER_DIR=$(cd "$SCRIPT_DIR/../../.." && pwd)
-PROGRAM_DIR=$(cd "$SCRIPT_DIR/../build/bin" && pwd)
+PROGRAM_DIR="$SCRIPT_DIR/../build/bin"
 
 
 

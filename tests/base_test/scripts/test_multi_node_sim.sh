@@ -15,7 +15,7 @@ TEST_PROGRAM="multi_node_send_recv"
 # 设置目录路径
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 DRIVER_DIR=$(cd "$SCRIPT_DIR/../../.." && pwd)
-PROGRAM_DIR=$(cd "$SCRIPT_DIR/../build/bin" && pwd)
+PROGRAM_DIR="$SCRIPT_DIR/../build/bin"
 
 
 

@@ -3,6 +3,7 @@
 # 设置目录路径
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 DRIVER_DIR=$(cd "$SCRIPT_DIR/../../.." && pwd)
+PROGRAM_DIR="$SCRIPT_DIR/../build/bin"
 
 # 设置日志目录
 mkdir -p $SCRIPT_DIR/../log/hw
@@ -44,9 +45,8 @@ sudo setpci  -s 01:00.0 CAP_EXP+28.w=0x1000
 
 
 
-cd $SCRIPT_DIR/..
-# sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" ./build/bin/loopback $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
-sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" ./build/bin/loopback_pertest $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
+# sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" "$PROGRAM_DIR/loopback" $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
+sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" "$PROGRAM_DIR/loopback_pertest" $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
 
 LOOPBACK_PID=$!
 

@@ -3,10 +3,11 @@
 # 设置目录路径
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 DRIVER_DIR=$(cd "$SCRIPT_DIR/../../.." && pwd)
+PROGRAM_DIR="$SCRIPT_DIR/../build/bin"
 
 # 设置日志目录
-mkdir -p $SCRIPT_DIR/../log/sim/loopback
-LOG_DIR=$(cd "$SCRIPT_DIR/../log/sim/loopback" && pwd)
+mkdir -p $SCRIPT_DIR/../log/sim/pcie_loopback
+LOG_DIR=$(cd "$SCRIPT_DIR/../log/sim/pcie_loopback" && pwd)
 
 # Source 共同函数库
 source $SCRIPT_DIR/../../common/test_common.sh
@@ -39,9 +40,8 @@ RUST_LOG=${RUST_LOG:-info}  # 默认 info 级别日志
 
 echo "Running loopback test with MSG_LEN=$MSG_LEN"
 
-cd $SCRIPT_DIR/..
-# sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" ./build/bin/loopback $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
-sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" ./build/bin/small_pack_loopback $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
+# sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" "$PROGRAM_DIR/loopback" $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
+sudo env RUST_BACKTRACE=debug RUST_LOG=$RUST_LOG LD_LIBRARY_PATH="$LD_LIBRARY_PATH" "$PROGRAM_DIR/small_pack_loopback" $MSG_LEN $ROUND > $LOG_DIR/loopback.log 2>&1 &
 
 LOOPBACK_PID=$!
 
