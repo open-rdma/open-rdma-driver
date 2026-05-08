@@ -4,7 +4,6 @@ use crate::ring::{
     traits::{DeviceAdaptor, RingSpecToCard, ToRingBytes},
 };
 use std::{
-    io,
     marker::PhantomData,
     sync::atomic::{fence, Ordering},
 };
@@ -88,22 +87,18 @@ where
     /// * `buffer` - DMA buffer (must have capacity >= BUF_SIZE)
     /// * `csr_ring` - CSR ring handle for hardware synchronization
     ///
-    /// # Errors
-    /// Returns an error if CSR write fails
-    ///
     /// # Panics
     /// Panics if buffer capacity doesn't match BUF_SIZE
     pub(crate) fn new(
         buffer: DmaBuffer<<Spec::Element as ToRingBytes>::Bytes>,
         csr_ring: RingCsr<Dev, Spec>,
-    ) -> io::Result<Self> {
+    ) -> Self {
         assert!(
             buffer.capacity() == RingPtr::<Spec>::buf_size(),
             "buffer capacity mismatch"
         );
 
-        // Write physical address to hardware CSR
-        csr_ring.write_base_addr(buffer.phys_addr())?;
+        csr_ring.write_base_addr(buffer.phys_addr());
         log::debug!(
             "ProducerRing: buffer write base addr with Sepc {} , pa=0x{:x}, capacity={}",
             std::any::type_name::<Spec>(),
@@ -111,37 +106,34 @@ where
             buffer.capacity()
         );
 
-        Ok(Self {
+        Self {
             buffer,
             csr_ring,
             cached_head: RingPtr::zero(),
             cached_hw_tail: RingPtr::zero(),
             _phantom: PhantomData,
-        })
+        }
     }
 
-    /// Get number of available slots (triggers CSR read)
-    ///
-    /// This operation reads the hardware tail pointer via CSR, which may
-    /// have performance implications. Consider using batch operations.
-    pub(crate) fn available(&mut self) -> io::Result<u32> {
-        // Read hardware tail pointer (modular, in [0, BUF_SIZE))
+    /// Get number of available slots (based on cached tail; call `sync_tail` first for accuracy)
+    pub(crate) fn available(&mut self) -> u32 {
         let hw_tail = self.cached_hw_tail;
 
         if self.cached_head.has_same_index(hw_tail) {
             if self.cached_head.has_same_raw(hw_tail) {
-                return Ok(RingPtr::<Spec>::buf_size());
+                return RingPtr::<Spec>::buf_size();
             } else {
-                return Ok(0);
+                return 0;
             }
         }
-        let used = self.cached_head
+        let used = self
+            .cached_head
             .index()
             .wrapping_sub(hw_tail.raw())
             .wrapping_add(RingPtr::<Spec>::buf_size())
             & RingPtr::<Spec>::buf_size_mask();
 
-        Ok(RingPtr::<Spec>::buf_size() - used)
+        RingPtr::<Spec>::buf_size() - used
     }
 
     /// Batch write using a callback function
@@ -154,38 +146,34 @@ where
     /// * `writer` - Callback that produces descriptor at given index
     ///
     /// # Returns
-    /// - `Ok(count)` if all descriptors written successfully
-    /// - `Ok(0)` if insufficient space
-    /// - `Err(_)` on CSR error
+    /// - count if all descriptors written successfully
+    /// - 0 if insufficient space
     ///
     /// # Example
     /// ```rust,ignore
-    /// let written = ring.batch_write(10, |i| {
-    ///     create_descriptor(i)
-    /// })?;
+    /// let written = ring.batch_write(10, |i| create_descriptor(i));
     /// ```
-    pub(crate) fn batch_write<F>(&mut self, count: u32, mut writer: F) -> io::Result<u32>
+    pub(crate) fn batch_write<F>(&mut self, count: u32, mut writer: F) -> u32
     where
         F: FnMut(u32) -> Spec::Element,
     {
         if count == 0 {
-            return Ok(0);
+            return 0;
         }
 
         if count > RingPtr::<Spec>::buf_size() {
-            return Ok(0);
+            return 0;
         }
 
-        if self.available()? < count {
-            self.sync_tail()?;
-            if self.available()? < count {
-                return Ok(0);
+        if self.available() < count {
+            self.sync_tail();
+            if self.available() < count {
+                return 0;
             }
         }
 
         let start_head = self.cached_head;
 
-        // Write all descriptors to DMA buffer
         for i in 0..count {
             let value = writer(i);
             let bytes = value.to_bytes();
@@ -193,15 +181,13 @@ where
             self.buffer.write(index, bytes);
         }
 
-        // Release fence ensures all descriptor writes are visible to hardware
         fence(Ordering::Release);
 
-        // Commit all descriptors with single CSR write
         let new_head = start_head.wrapping_add(count);
-        self.csr_ring.write_head(new_head.raw())?;
+        self.csr_ring.write_head(new_head.raw());
         self.cached_head = new_head;
 
-        Ok(count)
+        count
     }
 
     // /// Batch write from a slice
@@ -241,12 +227,12 @@ where
     //     Ok(true)
     // }
 
-    pub(crate) fn try_push_atomic(&mut self, elements: &[Spec::Element]) -> io::Result<bool> {
+    pub(crate) fn try_push_atomic(&mut self, elements: &[Spec::Element]) -> bool {
         // std::thread::sleep(std::time::Duration::from_nanos(1000));
+        // self.sync_tail();
+        let avai = self.available();
 
-        let avai = self.available()?;
-        // self.sync_tail()?;
-        // if avai < 1000 {
+        // if avai < 4097 {
         //     log::warn!(
         //         "try_push_atomic near overflow: available={}, hw_head is {}, tail is {}",
         //         avai,
@@ -273,10 +259,10 @@ where
         //     }
         // }
 
-        if (self.available()? as usize) < elements.len() {
-            self.sync_tail()?;
-            if (self.available()? as usize) < elements.len() {
-                return Ok(false);
+        if (self.available() as usize) < elements.len() {
+            self.sync_tail();
+            if (self.available() as usize) < elements.len() {
+                return false;
             }
         }
         elements.into_iter().enumerate().for_each(|(i, element)| {
@@ -284,14 +270,13 @@ where
                 .write(self.cached_head.add_index(i as u32), element.to_bytes())
         });
 
-        // Release fence ensures descriptor write is visible to hardware
         fence(Ordering::Release);
 
         let new_head = self.cached_head.wrapping_add(elements.len() as u32);
-        self.csr_ring.write_head(new_head.raw())?;
+        self.csr_ring.write_head(new_head.raw());
         self.cached_head = new_head;
 
-        Ok(true)
+        true
     }
 
     /// Get current head pointer value
@@ -305,22 +290,19 @@ where
     }
 
     /// Manually synchronize tail from hardware
-    pub(crate) fn sync_tail(&mut self) -> io::Result<()> {
+    pub(crate) fn sync_tail(&mut self) {
         log::trace!("sync_tail");
-        let hw_tail = RingPtr::<Spec>::new(self.csr_ring.read_tail()?);
+        let hw_tail = RingPtr::<Spec>::new(self.csr_ring.read_tail());
         log::info!("sync_tail: hw_tail={}", hw_tail.raw());
         self.cached_hw_tail = hw_tail;
-        Ok(())
     }
 
     /// Force set head pointer (for recovery/initialization)
     ///
     /// # Safety
     /// Caller must ensure this doesn't create inconsistent state
-    pub(crate) fn force_set_head(&mut self, head: u32) -> io::Result<()> {
-        self.csr_ring.write_head(head)?;
+    pub(crate) fn force_set_head(&mut self, head: u32) {
+        self.csr_ring.write_head(head);
         self.cached_head = RingPtr::new(head);
-
-        Ok(())
     }
 }

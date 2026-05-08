@@ -168,7 +168,7 @@ impl<Dev: DeviceAdaptor + Send + 'static> SingleThreadPollingWorker for SendWork
                 let descs = vec![SendQueueDesc::Seg0(fst), SendQueueDesc::Seg1(snd)];
 
                 // TODO 需要能够一次性 push 多个，这样可以防止多次读取和写入csr寄存器，需要结合 @open-rdma-driver/rust-driver/src/ring/traits.rs#L40  trait的优化
-                if !self.sq.try_push_atomic(&descs).unwrap() {
+                if !self.sq.try_push_atomic(&descs) {
                     self.local.push(wr);
                 }
             }

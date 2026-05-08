@@ -1,10 +1,10 @@
-use std::io;
-
 /// Abstraction over low-level CSR access.
-/// TODO 也许需要去除 io::Result，处理这个失败很可能没有意义
+///
+/// CSR failures are unrecoverable (hardware disconnected, simulator crashed),
+/// so implementations panic rather than returning errors.
 pub(crate) trait DeviceAdaptor: Clone {
-    fn read_csr(&self, addr: usize) -> io::Result<u32>;
-    fn write_csr(&self, addr: usize, data: u32) -> io::Result<()>;
+    fn read_csr(&self, addr: usize) -> u32;
+    fn write_csr(&self, addr: usize, data: u32);
 }
 
 /// Compile-time description of a ring.

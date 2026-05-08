@@ -254,11 +254,11 @@ impl EmulatedDevice {
 }
 
 impl DeviceAdaptor for EmulatedDevice {
-    fn read_csr(&self, addr: usize) -> io::Result<u32> {
-        self.0.read_csr(addr)
+    fn read_csr(&self, addr: usize) -> u32 {
+        self.0.read_csr(addr).expect("emulator TCP read failed")
     }
 
-    fn write_csr(&self, addr: usize, data: u32) -> io::Result<()> {
-        self.0.write_csr(addr, data)
+    fn write_csr(&self, addr: usize, data: u32) {
+        self.0.write_csr(addr, data).expect("emulator TCP write failed");
     }
 }

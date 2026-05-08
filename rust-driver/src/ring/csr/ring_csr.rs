@@ -50,8 +50,6 @@
 //! // send_ring.write_tail(10)?;  // ❌ Compile error - no ReaderOps for ToCard
 //! ```
 
-use std::io;
-
 use super::constants::{
     RING_OFFSET_BASE_HIGH, RING_OFFSET_BASE_LOW, RING_OFFSET_HEAD, RING_OFFSET_TAIL,
 };
@@ -77,41 +75,34 @@ impl<Dev: DeviceAdaptor, Spec: RingSpec> RingCsr<Dev, Spec> {
     }
 
     /// Read the base physical address of the ring buffer (64-bit)
-    pub(crate) fn read_base_addr(&self) -> io::Result<u64> {
-        let lo = self
-            .dev
-            .read_csr(self.spec.csr_base() + RING_OFFSET_BASE_LOW)?;
-        let hi = self
-            .dev
-            .read_csr(self.spec.csr_base() + RING_OFFSET_BASE_HIGH)?;
-        Ok(u64::from(lo) | (u64::from(hi) << 32))
+    pub(crate) fn read_base_addr(&self) -> u64 {
+        let lo = self.dev.read_csr(self.spec.csr_base() + RING_OFFSET_BASE_LOW);
+        let hi = self.dev.read_csr(self.spec.csr_base() + RING_OFFSET_BASE_HIGH);
+        u64::from(lo) | (u64::from(hi) << 32)
     }
 
     /// Write the base physical address of the ring buffer (64-bit)
-    pub(crate) fn write_base_addr(&self, phys_addr: crate::types::PhysAddr) -> io::Result<()> {
+    pub(crate) fn write_base_addr(&self, phys_addr: crate::types::PhysAddr) {
         let (lo, hi) = phys_addr.split();
-        self.dev
-            .write_csr(self.spec.csr_base() + RING_OFFSET_BASE_LOW, lo)?;
-        self.dev
-            .write_csr(self.spec.csr_base() + RING_OFFSET_BASE_HIGH, hi)?;
-        Ok(())
+        self.dev.write_csr(self.spec.csr_base() + RING_OFFSET_BASE_LOW, lo);
+        self.dev.write_csr(self.spec.csr_base() + RING_OFFSET_BASE_HIGH, hi);
     }
 }
 
 /// Operations for rings where the host writes (produces data to card)
 pub(crate) trait WriterOps {
     /// Write the head pointer (producer index)
-    fn write_head(&self, head: u32) -> io::Result<()>;
+    fn write_head(&self, head: u32);
     /// Read the tail pointer (consumer index)
-    fn read_tail(&self) -> io::Result<u32>;
+    fn read_tail(&self) -> u32;
 }
 
 /// Operations for rings where the host reads (consumes data from card)
 pub(crate) trait ReaderOps {
     /// Read the head pointer (producer index)
-    fn read_head(&self) -> io::Result<u32>;
+    fn read_head(&self) -> u32;
     /// Write the tail pointer (consumer index)
-    fn write_tail(&self, tail: u32) -> io::Result<()>;
+    fn write_tail(&self, tail: u32);
 }
 
 /// Implement writer operations for ToCard rings (host produces, card consumes)
@@ -122,13 +113,12 @@ where
     <Spec as RingSpec>::Element: ToRingBytes,
 {
     #[inline]
-    fn write_head(&self, head: u32) -> io::Result<()> {
-        self.dev
-            .write_csr(self.spec.csr_base() + RING_OFFSET_HEAD, head)
+    fn write_head(&self, head: u32) {
+        self.dev.write_csr(self.spec.csr_base() + RING_OFFSET_HEAD, head);
     }
 
     #[inline]
-    fn read_tail(&self) -> io::Result<u32> {
+    fn read_tail(&self) -> u32 {
         self.dev.read_csr(self.spec.csr_base() + RING_OFFSET_TAIL)
     }
 }
@@ -141,13 +131,12 @@ where
     <Spec as RingSpec>::Element: FromRingBytes,
 {
     #[inline]
-    fn read_head(&self) -> io::Result<u32> {
+    fn read_head(&self) -> u32 {
         self.dev.read_csr(self.spec.csr_base() + RING_OFFSET_HEAD)
     }
 
     #[inline]
-    fn write_tail(&self, tail: u32) -> io::Result<()> {
-        self.dev
-            .write_csr(self.spec.csr_base() + RING_OFFSET_TAIL, tail)
+    fn write_tail(&self, tail: u32) {
+        self.dev.write_csr(self.spec.csr_base() + RING_OFFSET_TAIL, tail);
     }
 }

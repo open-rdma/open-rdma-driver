@@ -50,7 +50,7 @@ where
         .into_iter()
         .map(DmaBuffer::new_for_spec::<crate::ring::spec::MetaReportRingSpec>)
         .zip(mrq_rings)
-        .map(|(q, ring)| ConsumerRingDefault::new(q, ring).unwrap())
+        .map(|(q, ring)| ConsumerRingDefault::new(q, ring))
         .collect();
 
     let handler = MetaHandler::new(

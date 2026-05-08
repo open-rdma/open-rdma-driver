@@ -38,13 +38,11 @@ impl<Dev: DeviceAdaptor> CommandConfigurator<Dev> {
         let req_csr_ring = cmd_req_ring(dev.clone());
         let resp_csr_ring = cmd_resp_ring(dev.clone());
         let tx_ring =
-            ProducerRingDefault::new(DmaBuffer::new_for_spec::<CmdReqSpec>(req_buf), req_csr_ring)
-                .unwrap();
+            ProducerRingDefault::new(DmaBuffer::new_for_spec::<CmdReqSpec>(req_buf), req_csr_ring);
         let rx_ring = ConsumerRingDefault::new(
             DmaBuffer::new_for_spec::<CmdRespSpec>(resp_buf),
             resp_csr_ring,
-        )
-        .unwrap();
+        );
 
         Ok(Self {
             cmd_qp: Mutex::new(CmdQp::new(tx_ring, rx_ring)),
@@ -176,7 +174,7 @@ impl<Dev: DeviceAdaptor> QpUpdate<'_, Dev> {
     fn push(&mut self, desc: CmdQueueDesc) {
         self.num = self.num.wrapping_add(1);
         //FIXME: handle failed condition
-        let result = self.req_queue.try_push_atomic(&[desc]).unwrap();
+        let result = self.req_queue.try_push_atomic(&[desc]);
         assert!(result, "failed to push command descriptor");
     }
 
@@ -189,7 +187,7 @@ impl<Dev: DeviceAdaptor> QpUpdate<'_, Dev> {
     fn wait(mut self) {
         while self.num != 0 {
             // TODO : 不应该自旋阻塞
-            if let Some(_resp) = self.resp_queue.try_pop().unwrap() {
+            if let Some(_resp) = self.resp_queue.try_pop() {
                 self.num = self.num.wrapping_sub(1);
             }
         }

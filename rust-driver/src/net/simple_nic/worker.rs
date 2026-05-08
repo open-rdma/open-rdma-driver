@@ -44,13 +44,11 @@ impl<Dev: DeviceAdaptor> SimpleNicController<Dev> {
         let tx_ring = ProducerRingDefault::new(
             DmaBuffer::new_for_spec::<SimpleNicTxSpec>(tx_rb_buf),
             req_csr_ring,
-        )
-        .unwrap();
+        );
         let rx_ring = ConsumerRingDefault::new(
             DmaBuffer::new_for_spec::<SimpleNicRxSpec>(rx_rb_buf),
             resp_csr_ring,
-        )
-        .unwrap();
+        );
 
         Ok(Self {
             tx: FrameTxQueue::new(tx_ring, tx_buffer.buf, tx_buffer.phys_addr),
@@ -134,7 +132,7 @@ impl<Dev: DeviceAdaptor + Send + 'static> FrameTx for FrameTxQueue<Dev> {
         let desc = self
             .build_desc(buf)
             .unwrap_or_else(|| unreachable!("buffer is smaller than u32::MAX"));
-        while !self.inner.try_push_atomic(&[desc]).unwrap() {
+        while !self.inner.try_push_atomic(&[desc]) {
             std::hint::spin_loop();
         }
 
@@ -164,7 +162,7 @@ impl<Dev: DeviceAdaptor + Send + 'static> FrameRx for FrameRxQueue<Dev> {
     #[allow(clippy::arithmetic_side_effects)]
     #[allow(clippy::as_conversions)] // converting u32 to usize
     fn recv_nonblocking(&mut self) -> io::Result<Vec<u8>> {
-        let Some(desc) = self.rx_queue.try_pop().unwrap() else {
+        let Some(desc) = self.rx_queue.try_pop() else {
             return Err(io::ErrorKind::WouldBlock.into());
         };
         let pos = (desc.slot_idx() as usize)

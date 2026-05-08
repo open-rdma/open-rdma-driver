@@ -73,7 +73,7 @@ impl TestDevice {
         };
         cmd_controller.set_network(network_config);
 
-        let data = adaptor.read_csr(0x100).unwrap();
+        let data = adaptor.read_csr(0x100);
         //adaptor.write_csr(0x100, data).unwrap();
         Ok(Self)
     }

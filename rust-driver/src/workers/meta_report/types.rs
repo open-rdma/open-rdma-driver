@@ -48,7 +48,7 @@ impl<Dev: DeviceAdaptor> MetaReportQueueHandler<Dev> {
             let ring = &mut self.inner[idx];
 
             // 直接调用 try_pop()，内部自动处理 CSR 同步
-            let Some(desc) = ring.try_pop().unwrap() else {
+            let Some(desc) = ring.try_pop() else {
                 continue;
             };
 

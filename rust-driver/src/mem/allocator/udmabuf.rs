@@ -1,4 +1,10 @@
 //! UDmaBuf allocator using the u-dma-buf kernel module.
+//!
+//! WARNING(cache-coherency): u-dma-buf does not universally guarantee CPU<->device
+//! cache coherency. Whether explicit cache sync is required depends on how the
+//! device file is opened/mapped and on platform properties such as hardware
+//! dma-coherency. In particular, do not assume that mmap + volatile access +
+//! Rust memory fences are sufficient on all platforms.
 
 use std::{
     fs::{File, OpenOptions},
@@ -15,6 +21,11 @@ use crate::mem::DmaBuf;
 use crate::mem::DmaBufAllocator;
 
 /// Allocator for DMA buffers using the u-dma-buf kernel module.
+///
+/// WARNING(cache-coherency): Buffers created here are backed by u-dma-buf. Their
+/// coherency semantics are platform- and configuration-dependent; callers must not
+/// assume automatic CPU/device cache sync unless that is guaranteed by the mapping
+/// mode or by external synchronization.
 pub(crate) struct UDmaBufAllocator {
     fd: File,
     sysfs_path: PathBuf,
@@ -34,6 +45,10 @@ impl UDmaBufAllocator {
 
     /// Opens a named u-dma-buf device, such as `udmabuf0`.
     pub(crate) fn open_with_name(name: &str) -> io::Result<Self> {
+        // TODO(cache-coherency): Opening with O_SYNC affects the u-dma-buf mapping mode,
+        // but does not by itself prove that all host/device cache-coherency requirements
+        // are satisfied on every platform. Revalidate the exact coherency contract when
+        // changing platform, kernel/u-dma-buf configuration, or buffer usage pattern.
         let fd = OpenOptions::new()
             .read(true)
             .write(true)
@@ -77,6 +92,10 @@ impl UDmaBufAllocator {
 
     #[allow(clippy::cast_possible_wrap)]
     fn create(&mut self, len: usize) -> io::Result<DmaBuf> {
+        // TODO(cache-coherency): This creates a CPU mapping for u-dma-buf memory, but the
+        // allocator does not perform explicit sync_for_cpu/sync_for_device operations.
+        // If the selected mapping mode is not fully coherent for the target platform,
+        // higher layers may still need explicit DMA cache synchronization.
         let size_total = self.size_total()?;
         if self.offset.checked_add(len).is_none_or(|x| x > size_total) {
             return Err(io::Error::new(

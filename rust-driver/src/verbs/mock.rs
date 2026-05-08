@@ -57,13 +57,11 @@ use super::ctx::VerbsOps;
 pub(crate) struct MockDeviceAdaptor;
 
 impl DeviceAdaptor for MockDeviceAdaptor {
-    fn read_csr(&self, addr: usize) -> io::Result<u32> {
-        Ok(0)
+    fn read_csr(&self, _addr: usize) -> u32 {
+        0
     }
 
-    fn write_csr(&self, addr: usize, data: u32) -> io::Result<()> {
-        Ok(())
-    }
+    fn write_csr(&self, _addr: usize, _data: u32) {}
 }
 
 #[derive(Debug, Clone, Copy)]

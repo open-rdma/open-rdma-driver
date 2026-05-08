@@ -6,7 +6,7 @@ use crate::ring::{
 };
 use std::fmt::Debug;
 use std::sync::atomic::Ordering;
-use std::{io, sync::atomic::fence};
+use std::sync::atomic::fence;
 
 // ============================================================================
 // Consumer Ring (Card → Host)
@@ -63,22 +63,18 @@ where
     /// * `buffer` - DMA buffer (must have capacity >= BUF_SIZE)
     /// * `csr_ring` - CSR ring handle for hardware synchronization
     ///
-    /// # Errors
-    /// Returns an error if CSR write fails
-    ///
     /// # Panics
     /// Panics if buffer capacity less than BUF_SIZE
     pub(crate) fn new(
         buffer: DmaBuffer<<Spec::Element as FromRingBytes>::Bytes>,
         csr_ring: RingCsr<Dev, Spec>,
-    ) -> io::Result<Self> {
+    ) -> Self {
         assert!(
             buffer.capacity() == RingPtr::<Spec>::buf_size(),
             "buffer capacity mismatch"
         );
 
-        // Write physical address to hardware CSR
-        csr_ring.write_base_addr(buffer.phys_addr())?;
+        csr_ring.write_base_addr(buffer.phys_addr());
 
         log::debug!(
             "ConsumerRing: buffer write base addr with Sepc {} , pa=0x{:x}, capacity={}",
@@ -87,24 +83,20 @@ where
             buffer.capacity()
         );
 
-        Ok(Self {
+        Self {
             buffer,
             csr_ring,
             cached_tail: RingPtr::zero(),
             cached_hw_head: RingPtr::zero(),
-        })
+        }
     }
 
     /// Get number of available elements to consume.
-    pub(crate) fn available(&mut self) -> io::Result<usize> {
-        // Read hardware head pointer (modular, in [0, BUF_SIZE))
-        let hw_head = RingPtr::<Spec>::new(self.csr_ring.read_head()?);
+    pub(crate) fn available(&mut self) -> usize {
+        let hw_head = RingPtr::<Spec>::new(self.csr_ring.read_head());
         self.cached_hw_head = hw_head;
-
-        // Modular distance: works correctly across wraparound
         let available = hw_head.wrapping_sub(self.cached_tail);
-
-        Ok(available as usize)
+        available as usize
     }
 
     fn read_and_advance(&mut self) -> <Spec::Element as FromRingBytes>::Bytes {
@@ -115,27 +107,23 @@ where
         ret
     }
 
-    fn write_tail_csr(&mut self) -> io::Result<()> {
+    fn write_tail_csr(&mut self) {
         // Write tail pointer to hardware including the guard bit.
         // Hardware uses a {guard, idx} pointer of width BUF_SIZE_EXP+1 bits;
         // stripping the guard bit (using BUF_SIZE_MASK) would send the wrong
         // wrap generation and cause hardware to misdetect full/empty.
-        self.csr_ring.write_tail(self.cached_tail.raw())
+        self.csr_ring.write_tail(self.cached_tail.raw());
     }
 
-    fn read_head_csr(&mut self) -> io::Result<u32> {
-        let hw_head = RingPtr::<Spec>::new(self.csr_ring.read_head()?);
+    fn read_head_csr(&mut self) -> u32 {
+        let hw_head = RingPtr::<Spec>::new(self.csr_ring.read_head());
         self.cached_hw_head = hw_head;
-        Ok(hw_head.raw())
+        hw_head.raw()
     }
 
     /// Pop single element with validation
     ///
-    /// # Returns
-    /// - `Ok(Some(value))` if valid element available
-    /// - `Ok(None)` if no elements or validation failed
-    /// - `Err(_)` on CSR error
-    pub(crate) fn try_pop(&mut self) -> io::Result<Option<Spec::Element>> {
+    pub(crate) fn try_pop(&mut self) -> Option<Spec::Element> {
         // std::thread::sleep(std::time::Duration::from_millis(1));
 
         // use std::sync::atomic::{AtomicU64, Ordering};
@@ -181,19 +169,19 @@ where
                     fence(Ordering::Acquire);
                     let a = self.read_and_advance();
                     let b = self.read_and_advance();
-                    self.write_tail_csr()?;
-                    Ok(Spec::Element::from_bytes(&[a, b]))
+                    self.write_tail_csr();
+                    Spec::Element::from_bytes(&[a, b])
                 } else {
-                    Ok(None)
+                    None
                 }
             } else {
                 fence(Ordering::Acquire);
                 let a = self.read_and_advance();
-                self.write_tail_csr()?;
-                Ok(Spec::Element::from_bytes(&[a]))
+                self.write_tail_csr();
+                Spec::Element::from_bytes(&[a])
             }
         } else {
-            Ok(None)
+            None
         }
         // todo!()
         // if(<Spec as RingSpecToHost>::Element)

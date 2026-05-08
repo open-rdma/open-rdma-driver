@@ -36,7 +36,7 @@ where
         .into_iter()
         .map(DmaBuffer::new_for_spec::<crate::ring::spec::SendRingSpec>)
         .zip(sq_rings)
-        .map(|(q, ring)| ProducerRingDefault::new(q, ring).unwrap());
+        .map(|(q, ring)| ProducerRingDefault::new(q, ring));
 
     // let send_queues: Vec<_> = bufs
     //     .into_iter()

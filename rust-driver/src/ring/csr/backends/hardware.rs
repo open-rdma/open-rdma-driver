@@ -84,12 +84,12 @@ impl VfioPciCsrAdaptor {
 
 // TODO: use u64 instead of usize
 impl DeviceAdaptor for VfioPciCsrAdaptor {
-    fn read_csr(&self, addr: usize) -> io::Result<u32> {
-        self.bar.read_le_u32(addr as u64)
+    fn read_csr(&self, addr: usize) -> u32 {
+        self.bar.read_le_u32(addr as u64).expect("PCIe BAR read failed")
     }
 
-    fn write_csr(&self, addr: usize, data: u32) -> io::Result<()> {
-        self.bar.write_le_u32(addr as u64, data)
+    fn write_csr(&self, addr: usize, data: u32) {
+        self.bar.write_le_u32(addr as u64, data).expect("PCIe BAR write failed");
     }
 }
 
@@ -114,14 +114,8 @@ impl SysfsPciCsrAdaptor {
 
 #[allow(unsafe_code, clippy::cast_ptr_alignment)]
 impl DeviceAdaptor for SysfsPciCsrAdaptor {
-    fn read_csr(&self, addr: usize) -> io::Result<u32> {
-        if addr % 4 != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "unaligned access",
-            ));
-        }
-
+    fn read_csr(&self, addr: usize) -> u32 {
+        assert!(addr % 4 == 0, "unaligned CSR read: 0x{addr:x}");
         let bar = self.bar.lock();
         unsafe {
             let ptr = bar.as_ptr().add(addr);
@@ -132,18 +126,12 @@ impl DeviceAdaptor for SysfsPciCsrAdaptor {
                 addr,
                 ret
             );
-            Ok(ret)
+            ret
         }
     }
 
-    fn write_csr(&self, addr: usize, data: u32) -> io::Result<()> {
-        if addr % 4 != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "unaligned access",
-            ));
-        }
-
+    fn write_csr(&self, addr: usize, data: u32) {
+        assert!(addr % 4 == 0, "unaligned CSR write: 0x{addr:x}");
         let mut bar = self.bar.lock();
         unsafe {
             let ptr = bar.as_mut_ptr().add(addr);
@@ -155,8 +143,6 @@ impl DeviceAdaptor for SysfsPciCsrAdaptor {
             );
             ptr.cast::<u32>().write_volatile(data);
         }
-
-        Ok(())
     }
 }
 
