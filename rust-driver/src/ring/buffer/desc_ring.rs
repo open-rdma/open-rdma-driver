@@ -155,6 +155,11 @@ impl<T: Copy> DmaBuffer<T> {
         }
     }
 
+    #[inline]
+    pub(crate) fn read_with_fn(&self, index: u32, f: fn(T) -> usize) -> usize {
+        f(self.read(index))
+    }
+
     /// Zero out element at index (for cleanup after consumption)
     #[inline]
     pub(crate) fn zero(&mut self, index: u32) {

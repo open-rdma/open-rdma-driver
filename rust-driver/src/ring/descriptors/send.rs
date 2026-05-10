@@ -381,11 +381,17 @@ pub(crate) enum SendQueueDesc {
 
 impl ToRingBytes for SendQueueDesc {
     type Bytes = [u8; 32];
+    const MAX_DESC_COUNT: usize = 1;
 
-    fn to_bytes(&self) -> [u8; 32] {
-        match self {
+    fn desc_count(&self) -> usize {
+        1
+    }
+
+    fn encode_to_slice(&self, out: &mut [[u8; 32]]) {
+        assert!(out.len() >= self.desc_count());
+        out[0] = match self {
             Self::Seg0(s) => s.serialize(),
             Self::Seg1(s) => s.serialize(),
-        }
+        };
     }
 }

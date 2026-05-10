@@ -125,19 +125,25 @@ impl_desc_serde!(SimpleNicTxQueueDesc, SimpleNicRxQueueDesc);
 
 impl ToRingBytes for SimpleNicTxQueueDesc {
     type Bytes = [u8; 32];
+    const MAX_DESC_COUNT: usize = 1;
 
-    fn to_bytes(&self) -> [u8; 32] {
-        self.serialize()
+    fn desc_count(&self) -> usize {
+        1
+    }
+
+    fn encode_to_slice(&self, out: &mut [[u8; 32]]) {
+        assert!(out.len() >= self.desc_count());
+        out[0] = self.serialize();
     }
 }
 
 impl FromRingBytes for SimpleNicRxQueueDesc {
     type Bytes = [u8; 32];
+    const MAX_DESC_COUNT: usize = 1;
 
-    fn from_bytes(bytes: &[Self::Bytes]) -> Option<Self> {
+    fn from_bytes(bytes: &[Self::Bytes]) -> Self {
         match bytes.len() {
-            0 => None,
-            1 => Some(DescDeserialize::deserialize(bytes[0])),
+            1 => DescDeserialize::deserialize(bytes[0]),
             _ => unreachable!(),
         }
     }
@@ -147,8 +153,7 @@ impl FromRingBytes for SimpleNicRxQueueDesc {
         bytes[31] >> 7 == 1
     }
 
-    fn has_next(bytes: &Self::Bytes) -> bool {
-        // do not has next
-        false
+    fn desc_count(_first: &Self::Bytes) -> usize {
+        1
     }
 }

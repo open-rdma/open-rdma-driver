@@ -5,8 +5,8 @@ use crate::ring::{
     traits::{DeviceAdaptor, FromRingBytes, RingSpecToHost},
 };
 use std::fmt::Debug;
-use std::sync::atomic::Ordering;
 use std::sync::atomic::fence;
+use std::sync::atomic::Ordering;
 
 // ============================================================================
 // Consumer Ring (Card → Host)
@@ -19,8 +19,9 @@ use std::sync::atomic::fence;
 ///
 /// # Synchronization Model
 /// - **Hardware manages**: head (producer index, read via CSR)
-/// - **Software manages**: `cached_tail` (consumer index)
-/// - **Memory ordering**: Acquire fence after reading descriptors
+/// - **Software manages**: `cached_released_tail` (locally released descriptor boundary)
+/// - **Tail CSR writes**: delayed until the end of `try_pop()`, at most once per call
+/// - **Memory ordering**: Acquire fence once a full logical element is assembled
 ///
 /// # Empty vs Full Distinction
 /// The hardware head CSR register is **modular** in `[0, BUF_SIZE)`.
@@ -42,12 +43,20 @@ where
     /// CSR ring handle for head/tail synchronization
     csr_ring: RingCsr<Dev, Spec>,
 
-    /// Cached local tail (software consumer pointer)
-    cached_tail: RingPtr<Spec>,
+    /// Cached local released tail (software-side descriptor release boundary).
+    /// This advances when descriptors are taken into the local scratch buffer,
+    /// and is flushed to hardware tail CSR at most once per `try_pop()` call.
+    cached_released_tail: RingPtr<Spec>,
 
     /// Cached hardware head (hardware producer pointer).
     /// MODULAR value in [0, BUF_SIZE). NOT monotonically increasing.
     cached_hw_head: RingPtr<Spec>,
+
+    /// Reusable scratch buffer for assembling the current logical element.
+    scratch: Vec<<Spec::Element as FromRingBytes>::Bytes>,
+
+    /// Pending logical element length, if the current element is not complete yet.
+    pending_expected_desc_count: Option<usize>,
 }
 
 impl<Dev, Spec> ConsumerRing<Dev, Spec>
@@ -86,8 +95,10 @@ where
         Self {
             buffer,
             csr_ring,
-            cached_tail: RingPtr::zero(),
+            cached_released_tail: RingPtr::zero(),
             cached_hw_head: RingPtr::zero(),
+            scratch: Vec::with_capacity(Spec::Element::MAX_DESC_COUNT),
+            pending_expected_desc_count: None,
         }
     }
 
@@ -95,15 +106,15 @@ where
     pub(crate) fn available(&mut self) -> usize {
         let hw_head = RingPtr::<Spec>::new(self.csr_ring.read_head());
         self.cached_hw_head = hw_head;
-        let available = hw_head.wrapping_sub(self.cached_tail);
+        let available = hw_head.wrapping_sub(self.cached_released_tail);
         available as usize
     }
 
-    fn read_and_advance(&mut self) -> <Spec::Element as FromRingBytes>::Bytes {
-        let index = self.cached_tail.index();
+    fn take_desc_and_advance_tail(&mut self) -> <Spec::Element as FromRingBytes>::Bytes {
+        let index = self.cached_released_tail.index();
         let ret = self.buffer.read(index);
         self.buffer.zero(index);
-        self.cached_tail = self.cached_tail.wrapping_add(1);
+        self.cached_released_tail = self.cached_released_tail.wrapping_add(1);
         ret
     }
 
@@ -112,7 +123,7 @@ where
         // Hardware uses a {guard, idx} pointer of width BUF_SIZE_EXP+1 bits;
         // stripping the guard bit (using BUF_SIZE_MASK) would send the wrong
         // wrap generation and cause hardware to misdetect full/empty.
-        self.csr_ring.write_tail(self.cached_tail.raw());
+        self.csr_ring.write_tail(self.cached_released_tail.raw());
     }
 
     fn read_head_csr(&mut self) -> u32 {
@@ -121,131 +132,67 @@ where
         hw_head.raw()
     }
 
-    /// Pop single element with validation
-    ///
-    pub(crate) fn try_pop(&mut self) -> Option<Spec::Element> {
-        // std::thread::sleep(std::time::Duration::from_millis(1));
-
-        // use std::sync::atomic::{AtomicU64, Ordering};
-        // use std::time::{SystemTime, UNIX_EPOCH};
-        // let avai = self.available()?;
-        // if avai > 4000 {
-        //     log::warn!(
-        //         "try_pop near overflow: available={}, hw_head is {}, tail is {}",
-        //         avai,
-        //         self.cached_hw_head,
-        //         self.cached_tail
-        //     );
-        // }
-        // {
-        //     static LAST_LOG_SECS: AtomicU64 = AtomicU64::new(0);
-        //     let now_secs = SystemTime::now()
-        //         .duration_since(UNIX_EPOCH)
-        //         .unwrap_or_default()
-        //         .as_secs();
-        //     let last = LAST_LOG_SECS.load(Ordering::Relaxed);
-        //     if now_secs > last
-        //         && LAST_LOG_SECS
-        //             .compare_exchange(last, now_secs, Ordering::Relaxed, Ordering::Relaxed)
-        //             .is_ok()
-        //     {
-        //         log::info!(
-        //             "[available] try_pop: available={}, hw_head is {}",
-        //             avai,
-        //             self.cached_hw_head
-        //         );
-        //     }
-        // }
-
-        let idx_first = self.cached_tail.index();
-
-        let first_element = self.buffer.read(idx_first);
-
-        if Spec::Element::is_valid(&first_element) {
-            if Spec::Element::has_next(&first_element) {
-                let idx_next = self.cached_tail.add_index(1);
-                let second_element = self.buffer.read(idx_next);
-                if Spec::Element::is_valid(&second_element) {
-                    fence(Ordering::Acquire);
-                    let a = self.read_and_advance();
-                    let b = self.read_and_advance();
-                    self.write_tail_csr();
-                    Spec::Element::from_bytes(&[a, b])
-                } else {
-                    None
-                }
-            } else {
-                fence(Ordering::Acquire);
-                let a = self.read_and_advance();
-                self.write_tail_csr();
-                Spec::Element::from_bytes(&[a])
-            }
+    fn try_read_desc(&mut self) -> Option<<Spec::Element as FromRingBytes>::Bytes> {
+        // TODO: This reads the full descriptor once for valid checking and then
+        // reads it again in `take_desc_and_advance_tail()`. For DMA correctness,
+        // prefer a small volatile valid/meta probe, then Acquire, then one full
+        // descriptor read.
+        let desc = self.buffer.read(self.cached_released_tail.index());
+        if Spec::Element::is_valid(&desc) {
+            fence(Ordering::Acquire);
+            Some(self.take_desc_and_advance_tail())
         } else {
             None
         }
-        // todo!()
-        // if(<Spec as RingSpecToHost>::Element)
-        // if()
-
-        // let idx_next = idx_first.wrapping_add(1) & RING_BUF_LEN_MASK;
-        // let value_first = self.read_index(idx_first);
-        // let value_next = self.read_index(idx_next);
-
-        // match (
-        //     cond(&value_first),
-        //     cond(&value_next),
-        //     require_next(&value_first),
-        // ) {
-        //     (true, true, true) => {
-        //         fence(Ordering::Acquire);
-        //         let value_first = self.read_and_advance(idx_first);
-        //         let value_next = self.read_and_advance(idx_next);
-        //         (Some(value_first), Some(value_next))
-        //     }
-        //     (true, _, false) => {
-        //         fence(Ordering::Acquire);
-        //         let value_first = self.read_and_advance(idx_first);
-        //         (Some(value_first), None)
-        //     }
-        //     (true, false, true) | (false, _, _) => (None, None),
-        // }
     }
 
-    /// Batch pop operation
+    /// Pop single element with validation
     ///
-    /// Pops up to `max_count` valid elements in a single operation.
-    /// Stops at the first invalid descriptor.
-    // pub(crate) fn pop_batch(&mut self, max_count: usize) -> io::Result<Vec<Spec::Bytes>> {
-    //     let available = self.available()?;
-    //     let count = available.min(max_count);
-    //     let mut results = Vec::with_capacity(count);
+    fn try_pop_without_sync(&mut self) -> Option<Spec::Element> {
+        while let Some(desc) = self.try_read_desc() {
+            if let Some(pending_count) = self.pending_expected_desc_count {
+                assert!(
+                    pending_count > self.scratch.len(),
+                    "pending element should not be complete yet when pushing desc"
+                );
+                self.scratch.push(desc);
+                if self.scratch.len() == pending_count {
+                    self.pending_expected_desc_count = None;
+                    let elem = Spec::Element::from_bytes(&self.scratch);
+                    self.scratch.clear();
+                    return Some(elem);
+                }
+            } else {
+                assert!(
+                    self.pending_expected_desc_count.is_none() && self.scratch.is_empty(),
+                    "scratch buffer must be empty when starting a new element"
+                );
+                let desc_count = Spec::Element::desc_count(&desc);
+                if desc_count == 1 {
+                    return Some(Spec::Element::from_bytes(std::slice::from_ref(&desc)));
+                } else {
+                    self.scratch.push(desc);
+                    self.pending_expected_desc_count = Some(desc_count);
+                }
+            }
+        }
+        None
+    }
 
-    //     for _ in 0..count {
-    //         let index = (self.cached_tail as usize) & Self::BUF_SIZE_MASK;
-    //         let bytes = self.buffer.read(index);
-
-    //         // Check if descriptor is valid
-    //         if !Spec::Element::is_valid(&bytes) {
-    //             break;
-    //         }
-
-    //         // Deserialize (always succeeds)
-    //         let value = Spec::Element::from_bytes(bytes);
-    //         results.push(value);
-    //         self.buffer.zero(index);
-    //         self.cached_tail = self.cached_tail.wrapping_add(1);
-    //     }
-
-    //     if !results.is_empty() {
-    //         fence(Ordering::Acquire);
-    //         self.csr_ring.write_tail(self.cached_tail)?;
-    //     }
-
-    //     Ok(results)
-    // }
+    pub(crate) fn try_pop(&mut self) -> Option<Spec::Element> {
+        // TODO: `try_pop_without_sync()` may consume and release descriptors but
+        // still return `None` for an incomplete multi-desc element. Tail CSR
+        // should be synced when `cached_released_tail` advances, not only when
+        // a complete element is returned.
+        let elem = self.try_pop_without_sync();
+        if elem.is_some() {
+            self.write_tail_csr();
+        }
+        elem
+    }
 
     pub(crate) fn tail(&self) -> u32 {
-        self.cached_tail.raw()
+        self.cached_released_tail.raw()
     }
 
     pub(crate) fn cached_head(&self) -> u32 {

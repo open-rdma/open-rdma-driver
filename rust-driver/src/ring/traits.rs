@@ -58,11 +58,16 @@ where
 /// The trait uses an associated type to define the byte representation.
 pub(crate) trait ToRingBytes: Copy {
     /// The byte-level representation used in DMA buffer
-    type Bytes: Copy;
+    type Bytes: Copy + Default;
 
-    /// Serialize this element to bytes for DMA transfer
-    /// TODO 也许需要写成 fn to_bytes(&self) -> &[Self::Bytes] 的形式更好
-    fn to_bytes(&self) -> Self::Bytes;
+    /// Maximum number of descriptors a single element may occupy.
+    const MAX_DESC_COUNT: usize;
+
+    /// Number of descriptors required by this element.
+    fn desc_count(&self) -> usize;
+
+    /// Encode this element into the provided descriptor slice prefix.
+    fn encode_to_slice(&self, out: &mut [Self::Bytes]);
 }
 
 /// Deserialization trait for ring buffer elements (used by ConsumerRing, Device → Host).
@@ -71,7 +76,10 @@ pub(crate) trait ToRingBytes: Copy {
 /// Supports both single and multi-descriptor scenarios through slice parameter.
 pub(crate) trait FromRingBytes: Sized {
     /// The byte-level representation used in DMA buffer
-    type Bytes: Copy;
+    type Bytes: Copy + Default;
+
+    /// Maximum number of descriptors a single element may occupy.
+    const MAX_DESC_COUNT: usize;
 
     /// Deserialize from one or more descriptors
     ///
@@ -80,22 +88,16 @@ pub(crate) trait FromRingBytes: Sized {
     ///   - `bytes.len() == 1`: Single descriptor (CmdQueue, WRITE, ACK)
     ///   - `bytes.len() == 2`: Double descriptor (READ, NAK, SendQueue)
     ///
-    /// # Returns
-    /// - `Some(Self)`: Successfully deserialized
-    /// - `None`: Deserialization failed (invalid format or insufficient length)
-    fn from_bytes(bytes: &[Self::Bytes]) -> Option<Self>;
+    /// The caller must pass the exact descriptor slice for one complete element.
+    fn from_bytes(bytes: &[Self::Bytes]) -> Self;
 
     /// Check if the first descriptor is valid (bit 31.7)
     ///
     /// This typically checks the valid bit set by hardware.
     fn is_valid(bytes: &Self::Bytes) -> bool;
 
-    /// Check if the first descriptor has a next descriptor (bit 31.6)
-    ///
-    /// Returns `false` by default. Override for types that support chaining.
-    fn has_next(bytes: &Self::Bytes) -> bool {
-        false
-    }
+    /// Return the descriptor count implied by the first descriptor.
+    fn desc_count(first: &Self::Bytes) -> usize;
 }
 
 // ============================================================================
@@ -117,8 +119,8 @@ pub(crate) trait FromRingBytes: Sized {
 //     type Bytes = [u8; 32];
 
 //     #[inline]
-//     fn from_bytes(bytes: &[Self::Bytes]) -> Option<Self> {
-//         bytes.first().copied()
+//     fn from_bytes(bytes: &[Self::Bytes]) -> Self {
+//         bytes[0]
 //     }
 
 //     #[inline]

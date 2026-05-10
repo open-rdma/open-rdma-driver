@@ -627,15 +627,21 @@ pub(crate) enum CmdQueueDesc {
 
 impl ToRingBytes for CmdQueueDesc {
     type Bytes = [u8; 32];
+    const MAX_DESC_COUNT: usize = 1;
 
-    fn to_bytes(&self) -> [u8; 32] {
-        match self {
+    fn desc_count(&self) -> usize {
+        1
+    }
+
+    fn encode_to_slice(&self, out: &mut [[u8; 32]]) {
+        assert!(out.len() >= self.desc_count());
+        out[0] = match self {
             CmdQueueDesc::UpdateMrTable(desc) => desc.serialize(),
             CmdQueueDesc::UpdatePGT(desc) => desc.serialize(),
             CmdQueueDesc::ManageQP(desc) => desc.serialize(),
             CmdQueueDesc::SetNetworkParam(desc) => desc.serialize(),
             CmdQueueDesc::SetRawPacketReceiveMeta(desc) => desc.serialize(),
-        }
+        };
     }
 }
 
@@ -645,11 +651,11 @@ pub(crate) struct CmdRespQueueDesc([u8; 32]);
 
 impl FromRingBytes for CmdRespQueueDesc {
     type Bytes = [u8; 32];
+    const MAX_DESC_COUNT: usize = 1;
 
-    fn from_bytes(bytes: &[Self::Bytes]) -> Option<Self> {
+    fn from_bytes(bytes: &[Self::Bytes]) -> Self {
         match bytes.len() {
-            0 => None,
-            1 => Some(CmdRespQueueDesc(bytes[0])),
+            1 => CmdRespQueueDesc(bytes[0]),
             _ => unreachable!(),
         }
     }
@@ -659,8 +665,7 @@ impl FromRingBytes for CmdRespQueueDesc {
         bytes[31] >> 7 == 1
     }
 
-    fn has_next(bytes: &Self::Bytes) -> bool {
-        // do not has next
-        false
+    fn desc_count(_first: &Self::Bytes) -> usize {
+        1
     }
 }

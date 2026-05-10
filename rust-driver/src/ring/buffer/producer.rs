@@ -176,9 +176,19 @@ where
 
         for i in 0..count {
             let value = writer(i);
-            let bytes = value.to_bytes();
+            let desc_count = value.desc_count();
+            assert!(
+                (1..=Spec::Element::MAX_DESC_COUNT).contains(&desc_count),
+                "invalid desc_count {desc_count} for producer element"
+            );
+            assert_eq!(
+                desc_count, 1,
+                "batch_write currently only supports single-descriptor elements"
+            );
+            let mut bytes = vec![<Spec::Element as ToRingBytes>::Bytes::default(); desc_count];
+            value.encode_to_slice(&mut bytes);
             let index = start_head.wrapping_add(i).index();
-            self.buffer.write(index, bytes);
+            self.buffer.write(index, bytes[0]);
         }
 
         fence(Ordering::Release);
@@ -228,6 +238,10 @@ where
     // }
 
     pub(crate) fn try_push_atomic(&mut self, elements: &[Spec::Element]) -> bool {
+        // TODO: This is only atomic for elements encoded as exactly one descriptor.
+        // For multi-descriptor elements, space checks, write offsets, and head
+        // advancement must be based on the total descriptor count, not
+        // `elements.len()`.
         // std::thread::sleep(std::time::Duration::from_nanos(1000));
         // self.sync_tail();
         let avai = self.available();
@@ -266,8 +280,19 @@ where
             }
         }
         elements.into_iter().enumerate().for_each(|(i, element)| {
+            let desc_count = element.desc_count();
+            assert!(
+                (1..=Spec::Element::MAX_DESC_COUNT).contains(&desc_count),
+                "invalid desc_count {desc_count} for producer element"
+            );
+            assert_eq!(
+                desc_count, 1,
+                "try_push_atomic currently only supports single-descriptor elements"
+            );
+            let mut bytes = vec![<Spec::Element as ToRingBytes>::Bytes::default(); desc_count];
+            element.encode_to_slice(&mut bytes);
             self.buffer
-                .write(self.cached_head.add_index(i as u32), element.to_bytes())
+                .write(self.cached_head.add_index(i as u32), bytes[0])
         });
 
         fence(Ordering::Release);

@@ -616,31 +616,34 @@ pub(crate) enum MetaReportQueueDesc {
 
 impl FromRingBytes for MetaReportQueueDesc {
     type Bytes = [u8; 32];
+    const MAX_DESC_COUNT: usize = 2;
 
-    fn from_bytes(bytes: &[Self::Bytes]) -> Option<Self> {
-        assert!(bytes.len() <= 2);
+    fn from_bytes(bytes: &[Self::Bytes]) -> Self {
+        match bytes.len() {
+            1 | 2 => {}
+            _ => unreachable!(),
+        }
 
         let mut iter = bytes.into_iter().map(|a| *a); // TODO 使用 iter 防止拷贝
         let first: Option<MetaReportQueueDescFirst> = iter.next().map(DescDeserialize::deserialize);
         let next: Option<MetaReportQueueDescNext> = iter.next().map(DescDeserialize::deserialize);
 
         match (first, next) {
-            (None, None) => None,
             (Some(MetaReportQueueDescFirst::PacketInfo(d)), None) if d.ecn_marked() => {
-                Some(MetaReportQueueDesc::CnpPacketInfo(d))
+                MetaReportQueueDesc::CnpPacketInfo(d)
             }
             (Some(MetaReportQueueDescFirst::PacketInfo(d)), None) => {
-                Some(MetaReportQueueDesc::WritePacketInfo(d))
+                MetaReportQueueDesc::WritePacketInfo(d)
             }
-            (Some(MetaReportQueueDescFirst::Ack(d)), None) => Some(MetaReportQueueDesc::Ack(d)),
+            (Some(MetaReportQueueDescFirst::Ack(d)), None) => MetaReportQueueDesc::Ack(d),
             (
                 Some(MetaReportQueueDescFirst::PacketInfo(f)),
                 Some(MetaReportQueueDescNext::ReadInfo(n)),
-            ) => Some(MetaReportQueueDesc::ReadPacketInfo((f, n))),
+            ) => MetaReportQueueDesc::ReadPacketInfo((f, n)),
             (
                 Some(MetaReportQueueDescFirst::Ack(f)),
                 Some(MetaReportQueueDescNext::AckExtra(n)),
-            ) => Some(MetaReportQueueDesc::Nak((f, n))),
+            ) => MetaReportQueueDesc::Nak((f, n)),
             _ => {
                 unreachable!("invalid descriptor format")
             }
@@ -652,8 +655,7 @@ impl FromRingBytes for MetaReportQueueDesc {
         bytes[31] >> 7 == 1
     }
 
-    fn has_next(bytes: &Self::Bytes) -> bool {
-        // Has-next bit is bit 6 of byte 31
-        (bytes[31] >> 6) & 1 == 1
+    fn desc_count(first: &Self::Bytes) -> usize {
+        if (first[31] >> 6) & 1 == 1 { 2 } else { 1 }
     }
 }
