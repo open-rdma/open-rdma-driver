@@ -1,0 +1,9 @@
+# RX pinned legacy TX baseline (2026-09-07).
+#
+# RX 的 wire 契约、parser 和 cocotb 期望值都针对这一版 TX 快照验证。
+# preflight 用 sha256 校验这些文件未被意外改动；OpenRDMA-flow 上游若
+# 继续演进，只提示差异而不阻止构建。更新快照时必须同步刷新本文件。
+4e406d872062a58c5c04b61977a20a0f8c6ef2c2ba99e5792881961dc5f9f3e6  CommonTypes.bsv
+9828fa8ae4183a91f7bf90eea07438f7444f0163fc64b6d2d04309fa95242572  TxTypes.bsv
+fa7715c1a25d4f16f66c93c722e9cc150bfec9ccf75f1f2ee133a9b1de382fe7  PacketAssembly.bsv
+1de7e8f6629ce11d9f670335134f9f83767a2b52cc46c168c7a25cd9b0933305  MrcTxScheduler.bsv

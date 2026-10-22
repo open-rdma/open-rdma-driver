@@ -1,0 +1,15 @@
+# Generated simulation outputs
+results/*
+!results/.gitkeep
+
+# Downloaded and built by `make bootstrap` / `make build`
+ns-3/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Editor and OS metadata
+.vscode/
+.idea/
+.DS_Store

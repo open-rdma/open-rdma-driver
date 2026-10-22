@@ -1,0 +1,26 @@
+# Artifacts exchanged between the three stages.  Every run rewrites them and
+# they are reproducible from the RTL, so they are not tracked.
+/results/
+
+# Bluespec and Verilator build products, one directory per module plus the
+# M0->M3 integration top.
+tx/*/build/
+
+# ns-3 program build products.
+ns3/build/
+
+# Waveform dumps.
+*.vcd
+*.fst
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Editor and OS metadata
+.vscode/
+.idea/
+.DS_Store
+
+# Ns3-lab carries its own .gitignore for its results/ and its ns-3/ checkout;
+# rx/ likewise for its per-module build directories.
