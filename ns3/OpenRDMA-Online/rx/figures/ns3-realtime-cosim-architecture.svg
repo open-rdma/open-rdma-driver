@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">OpenRDMA RX 与 NS-3 在线协同测试的可实施架构</title>
+  <desc id="desc">一个 Python 启动脚本同时启动 Verilator Cocotb 测试和已有的 NS-3 Lab 7 服务端，双方通过 Unix Domain Socket 的 ADVANCE RESULT 协议交换 Ethernet 帧，返回帧注入 RxTop，最后由 DMA 内存模型和 Scoreboard 检查。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#234E70"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 z" fill="#287A5A"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="900" fill="#FFFFFF"/>
+  <rect x="0" y="0" width="1600" height="10" fill="#183B56"/>
+
+  <text x="60" y="55" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="30" font-weight="700">OpenRDMA RX × NS-3 在线协同测试</text>
+  <text x="60" y="84" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="16">只包含实际进程、现有代码和需要新增的文件</text>
+  <line x1="60" y1="102" x2="1540" y2="102" stroke="#D1DAE2" stroke-width="2"/>
+
+  <!-- Concrete entry point -->
+  <rect x="60" y="125" width="1480" height="82" rx="8" fill="#F5F7F9" stroke="#8296A7" stroke-width="1.8"/>
+  <text x="86" y="154" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="14" font-weight="700">唯一启动入口</text>
+  <rect x="210" y="140" width="780" height="42" rx="5" fill="#FFFFFF" stroke="#55748E" stroke-width="1.5"/>
+  <text x="600" y="167" text-anchor="middle" fill="#183B56" font-family="'IBM Plex Mono',Consolas,monospace" font-size="15">python Ns3-lab/Lab7-OnlineSocketCosim/run_rx_cosim.py</text>
+  <rect x="1008" y="140" width="98" height="28" rx="4" fill="#E8F1FA" stroke="#3C78A8" stroke-width="1"/>
+  <text x="1057" y="159" text-anchor="middle" fill="#245B8A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12" font-weight="700">需要新增</text>
+  <text x="1125" y="160" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="13">启动下面两个进程，并设置 LAB7_SOCKET</text>
+  <text x="210" y="197" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">不增加“协同控制器”进程；启动、清理和超时处理直接写在这个 Python 脚本里。</text>
+
+  <!-- Process A -->
+  <rect x="60" y="245" width="965" height="520" rx="10" fill="#FAFBFC" stroke="#55748E" stroke-width="2"/>
+  <rect x="60" y="245" width="965" height="52" rx="10" fill="#183B56"/>
+  <rect x="60" y="285" width="965" height="12" fill="#183B56"/>
+  <text x="86" y="279" fill="#FFFFFF" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="20" font-weight="700">进程 A：Verilator + Cocotb</text>
+  <text x="998" y="278" text-anchor="end" fill="#D9E8F3" font-family="'IBM Plex Mono',Consolas,monospace" font-size="12">mvp/rx target: tx_rx_loopback</text>
+
+  <!-- TX -->
+  <rect x="95" y="335" width="205" height="118" rx="7" fill="#FFFFFF" stroke="#55748E" stroke-width="1.7"/>
+  <rect x="110" y="350" width="58" height="24" rx="4" fill="#E6F2EA"/>
+  <text x="139" y="367" text-anchor="middle" fill="#287A5A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">已有</text>
+  <text x="197" y="395" text-anchor="middle" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="17" font-weight="700">TX RTL</text>
+  <text x="197" y="418" text-anchor="middle" fill="#52687A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="12">M2 → M3</text>
+  <text x="197" y="439" text-anchor="middle" fill="#52687A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="11">txChannel[0..3]</text>
+
+  <!-- Cocotb test -->
+  <rect x="350" y="320" width="285" height="148" rx="7" fill="#F2F7FB" stroke="#3C78A8" stroke-width="2"/>
+  <rect x="365" y="335" width="72" height="24" rx="4" fill="#E8F1FA"/>
+  <text x="401" y="352" text-anchor="middle" fill="#245B8A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">需要新增</text>
+  <text x="492" y="386" text-anchor="middle" fill="#183B56" font-family="'IBM Plex Mono',Consolas,monospace" font-size="14" font-weight="700">test_ns3_cosim.py</text>
+  <text x="492" y="414" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="13">① 捕获 TX Ethernet frame</text>
+  <text x="492" y="438" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="13">② 把返回 frame 注入 rxLane</text>
+  <text x="492" y="459" text-anchor="middle" fill="#52687A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="11">tests/integration/</text>
+
+  <!-- Socket client -->
+  <rect x="690" y="335" width="280" height="118" rx="7" fill="#FFFFFF" stroke="#3C78A8" stroke-width="1.8"/>
+  <rect x="705" y="350" width="72" height="24" rx="4" fill="#E8F1FA"/>
+  <text x="741" y="367" text-anchor="middle" fill="#245B8A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">需要新增</text>
+  <text x="830" y="395" text-anchor="middle" fill="#183B56" font-family="'IBM Plex Mono',Consolas,monospace" font-size="14" font-weight="700">ns3/socket_cosim.py</text>
+  <text x="830" y="420" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">复用已有 Lab 7 Python 协议代码</text>
+  <text x="830" y="441" text-anchor="middle" fill="#52687A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="11">HELLO · ADVANCE · RESULT · FINISH</text>
+
+  <line x1="300" y1="394" x2="340" y2="394" stroke="#234E70" stroke-width="2.6" marker-end="url(#arrow)"/>
+  <text x="320" y="380" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11">帧</text>
+  <line x1="635" y1="394" x2="680" y2="394" stroke="#234E70" stroke-width="2.6" marker-end="url(#arrow)"/>
+
+  <!-- RX + DMA + checker -->
+  <rect x="95" y="555" width="250" height="130" rx="7" fill="#FFFFFF" stroke="#287A5A" stroke-width="1.8"/>
+  <rect x="110" y="570" width="58" height="24" rx="4" fill="#E6F2EA"/>
+  <text x="139" y="587" text-anchor="middle" fill="#287A5A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">已有</text>
+  <text x="220" y="615" text-anchor="middle" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="18" font-weight="700">RX RTL：mkRxTop</text>
+  <text x="220" y="641" text-anchor="middle" fill="#52687A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="12">M0 → M1 → M2 → M3 → M4</text>
+  <text x="220" y="665" text-anchor="middle" fill="#52687A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="11">rxLane[0..3]</text>
+
+  <rect x="400" y="555" width="240" height="130" rx="7" fill="#FFFFFF" stroke="#8A6A21" stroke-width="1.7"/>
+  <rect x="415" y="570" width="58" height="24" rx="4" fill="#E6F2EA"/>
+  <text x="444" y="587" text-anchor="middle" fill="#287A5A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">已有</text>
+  <text x="520" y="615" text-anchor="middle" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="17" font-weight="700">DMA / GPU 模型</text>
+  <text x="520" y="641" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">收集 descriptor + payload</text>
+  <text x="520" y="665" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">写内存并返回 completion</text>
+
+  <rect x="695" y="555" width="275" height="130" rx="7" fill="#FFFFFF" stroke="#55748E" stroke-width="1.7"/>
+  <rect x="710" y="570" width="58" height="24" rx="4" fill="#E6F2EA"/>
+  <text x="739" y="587" text-anchor="middle" fill="#287A5A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">已有</text>
+  <text x="832" y="615" text-anchor="middle" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="17" font-weight="700">断言 / Scoreboard</text>
+  <text x="832" y="641" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">payload、地址、ACK、CQE</text>
+  <text x="832" y="665" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">丢包时不得错误完成</text>
+
+  <path d="M492 468 L492 510 L220 510 L220 545" fill="none" stroke="#287A5A" stroke-width="2.5" marker-end="url(#arrow-green)"/>
+  <text x="326" y="502" fill="#287A5A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11">RESULT 中 delivered frame</text>
+  <line x1="345" y1="620" x2="390" y2="620" stroke="#234E70" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="640" y1="620" x2="685" y2="620" stroke="#234E70" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M345 660 L670 660 L670 680 L685 680" fill="none" stroke="#718596" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+  <text x="500" y="703" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11">feedback / completion / errors</text>
+
+  <!-- Process B -->
+  <rect x="1070" y="245" width="470" height="440" rx="10" fill="#F8FCFB" stroke="#287A5A" stroke-width="2"/>
+  <rect x="1070" y="245" width="470" height="52" rx="10" fill="#287A5A"/>
+  <rect x="1070" y="285" width="470" height="12" fill="#287A5A"/>
+  <text x="1096" y="279" fill="#FFFFFF" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="20" font-weight="700">进程 B：ns-3 Lab 7</text>
+
+  <rect x="1110" y="330" width="390" height="98" rx="7" fill="#FFFFFF" stroke="#5D9A80" stroke-width="1.7"/>
+  <rect x="1125" y="345" width="58" height="24" rx="4" fill="#E6F2EA"/>
+  <text x="1154" y="362" text-anchor="middle" fill="#287A5A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">已有</text>
+  <text x="1305" y="377" text-anchor="middle" fill="#183B56" font-family="'IBM Plex Mono',Consolas,monospace" font-size="14" font-weight="700">Lab7-OnlineSocketCosim/main.cc</text>
+  <text x="1305" y="402" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">Unix Domain Socket server</text>
+  <text x="1305" y="420" text-anchor="middle" fill="#52687A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="10">common/socket-protocol.h</text>
+
+  <rect x="1110" y="475" width="390" height="142" rx="7" fill="#FFFFFF" stroke="#5D9A80" stroke-width="1.7"/>
+  <rect x="1125" y="490" width="58" height="24" rx="4" fill="#E6F2EA"/>
+  <text x="1154" y="507" text-anchor="middle" fill="#287A5A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="11" font-weight="700">已有</text>
+  <text x="1305" y="530" text-anchor="middle" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="17" font-weight="700">FourPathRoceNetwork</text>
+  <text x="1305" y="556" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">4 × 100 Gbit/s 路径</text>
+  <text x="1305" y="580" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">200 / 400 / 800 / 2000 ns 时延</text>
+  <text x="1305" y="604" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">返回 delivered / dropped 事件和原始 frame</text>
+
+  <line x1="1305" y1="428" x2="1305" y2="465" stroke="#287A5A" stroke-width="2.4" marker-end="url(#arrow-green)"/>
+
+  <!-- Concrete socket exchange -->
+  <line x1="970" y1="365" x2="1100" y2="365" stroke="#234E70" stroke-width="2.7" marker-end="url(#arrow)"/>
+  <text x="1035" y="347" text-anchor="middle" fill="#183B56" font-family="'IBM Plex Mono',Consolas,monospace" font-size="11" font-weight="700">ADVANCE</text>
+  <text x="1035" y="389" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="10">frame + channel + time_ps</text>
+
+  <line x1="1100" y1="430" x2="980" y2="430" stroke="#287A5A" stroke-width="2.7" marker-end="url(#arrow-green)"/>
+  <text x="1038" y="420" text-anchor="middle" fill="#287A5A" font-family="'IBM Plex Mono',Consolas,monospace" font-size="11" font-weight="700">RESULT</text>
+  <text x="1038" y="451" text-anchor="middle" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="10">event + frame + arrival time</text>
+
+  <!-- Launcher fanout -->
+  <path d="M600 207 L600 225 L540 225 L540 237" fill="none" stroke="#718596" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <path d="M900 207 L900 225 L1305 225 L1305 237" fill="none" stroke="#718596" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- Implementation summary -->
+  <rect x="60" y="800" width="1480" height="62" rx="6" fill="#F5F7F9" stroke="#B2C0CB" stroke-width="1.4"/>
+  <text x="85" y="826" fill="#183B56" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="13" font-weight="700">实际改动只有 3 项：</text>
+  <text x="225" y="826" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="13">① 新增 run_rx_cosim.py</text>
+  <text x="470" y="826" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="13">② 将现有 SocketCosimClient 放入 mvp/rx</text>
+  <text x="850" y="826" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="13">③ 新增 test_ns3_cosim.py，把 RESULT frame 注入 RxTop</text>
+  <text x="85" y="850" fill="#52687A" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-size="12">NS-3 服务端、二进制协议、TX/RX RTL、DMA 模型和 Scoreboard 均复用现有代码，不新增抽象服务。</text>
+</svg>

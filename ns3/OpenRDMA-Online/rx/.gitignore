@@ -1,0 +1,6 @@
+build/
+*.bo
+*.ba
+*.o
+*.so
+*.vcd
